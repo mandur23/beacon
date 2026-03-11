@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<!-- 메트릭 카드 -->
+<div class="grid-4 mb16">
+    <div th:each="m : ${metrics}" class="card" style="padding:16px 20px">
+        <div class="stat-label mb8" th:text="${m.label}"></div>
+        <div class="stat-value mb10" th:text="${m.value}"
+             th:style="'color:' + ${m.color}"></div>
+        <div class="progress-bar">
+            <div class="progress-fill"
+                 th:style="'width:' + ${m.pct} + '%;background:' + ${m.color}"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 탭 -->
+<div class="tab-bar mb16">
+    <a th:href="@{/network(tab='topology')}"
+       th:classappend="${tab == 'topology'} ? ' active'" class="tab-btn">네트워크 토폴로지</a>
+    <a th:href="@{/network(tab='interfaces')}"
+       th:classappend="${tab == 'interfaces'} ? ' active'" class="tab-btn">인터페이스</a>
+    <a th:href="@{/network(tab='traffic')}"
+       th:classappend="${tab == 'traffic'} ? ' active'" class="tab-btn">트래픽 분석</a>
+</div>
+
+<!-- 토폴로지 -->
+<th:block th:if="${tab == 'topology'}">
+<div class="grid-12">
+    <div class="card span-8">
+        <div class="card-header">
+            <div class="card-title">네트워크 토폴로지</div>
+            <div class="card-sub">실시간 네트워크 구성도</div>
+        </div>
+        <div style="padding:12px 16px">
+            <svg id="topoSvg" width="100%" height="280" viewBox="0 0 100 100"></svg>
+            <div class="legend" style="justify-content:center;margin-top:8px">
+                <span class="legend-item red">● 방화벽</span>
+                <span class="legend-item accent">● 영역</span>
+                <span class="legend-item green">● 서버</span>
+                <span class="legend-item yellow">● 센서</span>
+            </div>
+        </div>
+    </div>
+    <div class="card span-4">
+        <div class="card-header"><div class="card-title">장비 상태</div></div>
+        <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <div th:each="n : ${nodes}" class="node-row">
+                <span class="dot"
+                      th:style="${n.status == 'ok'} ? 'background:#06d6a0' : 'background:#ffd166'"></span>
+                <div style="flex:1">
+                    <div class="node-label" th:text="${n.label}"></div>
+                    <div class="node-sub" th:text="${n.id} + ' · ' + ${n.type}"></div>
+                </div>
+                <span class="tag"
+                      th:text="${n.status == 'ok'} ? '정상' : '경고'"
+                      th:style="${n.status == 'ok'} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ffd166;background:#ffd16618;border-color:#ffd16644'">
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+<script th:inline="none">
+(function() {
+    const nodes = [
+        {id:"FW",label:"방화벽",x:50,y:50,type:"firewall"},
+        {id:"DMZ",label:"DMZ",x:50,y:25,type:"zone"},
+        {id:"WEB",label:"웹서버",x:28,y:12,type:"server"},
+        {id:"API",label:"API서버",x:72,y:12,type:"server"},
+        {id:"INT",label:"내부망",x:50,y:75,type:"zone"},
+        {id:"DB",label:"DB서버",x:28,y:90,type:"server"},
+        {id:"APP",label:"앱서버",x:72,y:90,type:"server"},
+        {id:"IDS",label:"IDS",x:82,y:50,type:"sensor"},
+    ];
+    const links = [["FW","DMZ"],["FW","INT"],["DMZ","WEB"],["DMZ","API"],["INT","DB"],["INT","APP"],["FW","IDS"]];
+    const colors = {firewall:"#ff3d5a",zone:"#00e5ff",server:"#06d6a0",sensor:"#ffd166"};
+    const svg = document.getElementById('topoSvg');
+    const ns = "http://www.w3.org/2000/svg";
+
+    links.forEach(([a,b]) => {
+        const na = nodes.find(n=>n.id===a), nb = nodes.find(n=>n.id===b);
+        const line = document.createElementNS(ns,"line");
+        Object.assign(line, {});
+        line.setAttribute("x1",na.x); line.setAttribute("y1",na.y);
+        line.setAttribute("x2",nb.x); line.setAttribute("y2",nb.y);
+        line.setAttribute("stroke","#1e2235"); line.setAttribute("stroke-width","0.5");
+        svg.appendChild(line);
+    });
+    nodes.forEach(n => {
+        const c = colors[n.type];
+        const g = document.createElementNS(ns,"g");
+        const circle = document.createElementNS(ns,"circle");
+        circle.setAttribute("cx",n.x); circle.setAttribute("cy",n.y); circle.setAttribute("r","5");
+        circle.setAttribute("fill",c+"22"); circle.setAttribute("stroke",c); circle.setAttribute("stroke-width","0.7");
+        const dot = document.createElementNS(ns,"circle");
+        dot.setAttribute("cx",n.x); dot.setAttribute("cy",n.y); dot.setAttribute("r","1.8"); dot.setAttribute("fill",c);
+        const text = document.createElementNS(ns,"text");
+        text.setAttribute("x",n.x); text.setAttribute("y",n.y+9);
+        text.setAttribute("text-anchor","middle"); text.setAttribute("font-size","3.5"); text.setAttribute("fill","#4a5570");
+        text.textContent = n.label;
+        g.appendChild(circle); g.appendChild(dot); g.appendChild(text);
+        svg.appendChild(g);
+    });
+})();
+</script>
+</th:block>
+
+<!-- 인터페이스 -->
+<th:block th:if="${tab == 'interfaces'}">
+<div class="card">
+    <div class="card-header"><div class="card-title">네트워크 인터페이스</div></div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>인터페이스</th><th>IP 주소</th><th>속도</th><th>TX</th><th>RX</th><th>패킷</th><th>오류</th><th>상태</th></tr></thead>
+            <tbody>
+                <tr th:each="iface : ${interfaces}">
+                    <td class="mono accent" th:text="${iface.name}"></td>
+                    <td class="mono dim" th:text="${iface.ip}"></td>
+                    <td class="dim" th:text="${iface.speed}"></td>
+                    <td class="mono red" th:text="${iface.tx}"></td>
+                    <td class="mono green" th:text="${iface.rx}"></td>
+                    <td class="mono dim" th:text="${iface.packets}"></td>
+                    <td th:text="${iface.errors}"
+                        th:style="${iface.errors != '0'} ? 'color:#ffd166' : 'color:#2a3248'"></td>
+                    <td>
+                        <span class="tag"
+                              th:text="${iface.status}"
+                              th:style="${iface.status == 'up'} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44'">
+                        </span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</th:block>
+
+<!-- 트래픽 분석 -->
+<th:block th:if="${tab == 'traffic'}">
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><div class="card-title">프로토콜별 분포</div></div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">HTTPS</span><span class="mono accent">52%</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:52%;background:#00e5ff"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">HTTP</span><span class="mono accent">18%</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:18%;background:#06d6a0"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">DNS</span><span class="mono accent">12%</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:12%;background:#ffd166"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">SSH</span><span class="mono accent">8%</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:8%;background:#ff8c42"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">기타</span><span class="mono accent">10%</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:10%;background:#4a5570"></div></div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><div class="card-title">Top 소스 IP</div></div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">203.45.88.12</span><span class="mono" style="color:#ff3d5a">1284</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:100%;background:#ff3d5a"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">88.11.204.5</span><span class="mono" style="color:#ff8c42">892</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:69.5%;background:#ff8c42"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">192.168.43.22</span><span class="mono" style="color:#ffd166">441</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:34.3%;background:#ffd166"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">10.0.0.88</span><span class="mono" style="color:#06d6a0">284</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:22.1%;background:#06d6a0"></div></div>
+            </div>
+            <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">45.90.123.4</span><span class="mono" style="color:#00e5ff">192</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:15%;background:#00e5ff"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+</th:block>
+
+</content>
+</body>
+</html>

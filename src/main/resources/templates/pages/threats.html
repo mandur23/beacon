@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<!-- 위험도 필터 카드 -->
+<div class="grid-5 mb16">
+    <th:block th:each="entry : ${severityCounts}">
+        <a th:href="@{/threats(severity=${entry.key})}"
+           class="sev-card"
+           th:classappend="${currentSeverity == entry.key} ? ' active'"
+           th:data-color="${entry.key == 'critical'} ? '#ff3d5a' :
+                           (${entry.key == 'high'} ? '#ff8c42' :
+                           (${entry.key == 'medium'} ? '#ffd166' :
+                           (${entry.key == 'low'} ? '#06d6a0' : '#00e5ff')))">
+            <div class="sev-count"
+                 th:text="${entry.value}"
+                 th:style="'color:' + (${entry.key == 'critical'} ? '#ff3d5a' :
+                            (${entry.key == 'high'} ? '#ff8c42' :
+                            (${entry.key == 'medium'} ? '#ffd166' :
+                            (${entry.key == 'low'} ? '#06d6a0' : '#00e5ff'))))">
+            </div>
+            <div class="sev-label"
+                 th:text="${entry.key == 'critical'} ? '위급' :
+                            (${entry.key == 'high'} ? '높음' :
+                            (${entry.key == 'medium'} ? '중간' :
+                            (${entry.key == 'low'} ? '낮음' : '정보')))">
+            </div>
+        </a>
+    </th:block>
+</div>
+
+<!-- 이벤트 테이블 -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="card-title">이벤트 로그</div>
+            <div class="card-sub" th:text="${#lists.size(events)} + '건 표시'"></div>
+        </div>
+        <form th:action="@{/threats}" method="get" style="display:flex;gap:8px;align-items:center">
+            <input type="hidden" name="severity" th:value="${currentSeverity}"/>
+            <input type="text" name="search" th:value="${search}"
+                   placeholder="검색 (IP, 유형, ID...)" class="search-input"/>
+            <button type="submit" class="btn-sm accent">검색</button>
+            <a th:href="@{/threats}" class="btn-sm dim">초기화</a>
+        </form>
+    </div>
+    <div class="table-wrap scroll-y" style="max-height:520px">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th><th>위협 유형</th><th>IP 주소</th>
+                    <th>프로토콜</th><th>포트</th><th>위치</th>
+                    <th>위험도</th><th>상태</th><th>시간</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="e : ${events}" class="clickable-row"
+                    th:data-dbid="${e.dbId}"
+                    th:data-id="${e.id}" th:data-type="${e.type}"
+                    th:data-ip="${e.ip}" th:data-loc="${e.location}"
+                    th:data-sev="${e.severity}" th:data-sevlabel="${e.severityLabel}"
+                    th:data-sevcolor="${e.severityColor}"
+                    th:data-status="${e.status}" th:data-time="${e.time}"
+                    th:data-proto="${e.protocol}" th:data-port="${e.port}">
+                    <td class="mono accent" th:text="${e.id}"></td>
+                    <td th:text="${e.type}"></td>
+                    <td class="mono dim" th:text="${e.ip}"></td>
+                    <td class="dim" th:text="${e.protocol}"></td>
+                    <td class="mono dim" th:text="${e.port}"></td>
+                    <td class="dim" th:text="${e.location}"></td>
+                    <td>
+                        <span class="badge"
+                              th:text="${e.severityLabel}"
+                              th:style="'color:' + ${e.severityColor} + ';background:' + ${e.severityColor} + '18;border-color:' + ${e.severityColor} + '44'">
+                        </span>
+                    </td>
+                    <td>
+                        <span class="tag"
+                              th:text="${e.status}"
+                              th:style="${e.status == '차단됨'} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ffd166;background:#ffd16618;border-color:#ffd16644'">
+                        </span>
+                    </td>
+                    <td class="muted" th:text="${e.time}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 상세 패널 (JS로 토글) -->
+<div id="detailPanel" class="detail-panel" style="display:none">
+    <div class="card" style="margin-top:14px">
+        <div class="card-header">
+            <div class="card-title">이벤트 상세</div>
+            <button onclick="closeDetail()" class="btn-icon">×</button>
+        </div>
+        <div class="detail-body">
+            <div class="detail-top" id="detailTop"></div>
+            <div id="detailRows"></div>
+            <div class="detail-actions">
+                <button class="btn-danger" id="blockBtn">IP 차단</button>
+                <button class="btn-accent" id="investigateBtn">조사 시작</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentEventDbId = null;
+
+document.querySelectorAll('.clickable-row').forEach(row => {
+    row.addEventListener('click', () => {
+        const d = row.dataset;
+        currentEventDbId = d.dbid;
+        document.getElementById('detailPanel').style.display = 'block';
+        document.getElementById('detailTop').innerHTML = `
+            <span class="badge" style="color:${d.sevcolor};background:${d.sevcolor}18;border-color:${d.sevcolor}44">${d.sevlabel}</span>
+            <div style="font-size:14px;color:#fff;font-weight:600;margin-top:8px">${d.type}</div>
+            <div style="font-size:10px;color:var(--dim);margin-top:4px">${d.id} · ${d.time}</div>
+        `;
+        const rows = [
+            ['소스 IP', d.ip], ['프로토콜', d.proto], ['포트', d.port],
+            ['발원 위치', d.loc], ['처리 상태', d.status],
+        ];
+        document.getElementById('detailRows').innerHTML = rows.map(([k,v]) =>
+            `<div class="detail-row"><span class="dim">${k}</span><span class="mono">${v}</span></div>`
+        ).join('');
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+});
+
+document.getElementById('blockBtn').addEventListener('click', () => {
+    if (!currentEventDbId) return;
+    if (!confirm('해당 이벤트의 소스 IP를 차단하시겠습니까?')) return;
+    fetch(`/api/threats/${currentEventDbId}/block`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) { closeDetail(); location.reload(); }
+        })
+        .catch(() => showToast('오류가 발생했습니다', 'error'));
+});
+
+document.getElementById('investigateBtn').addEventListener('click', () => {
+    if (!currentEventDbId) return;
+    fetch(`/api/threats/${currentEventDbId}/investigate`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.success ? 'info' : 'error');
+            if (data.success) location.reload();
+        })
+        .catch(() => showToast('오류가 발생했습니다', 'error'));
+});
+
+function closeDetail() { document.getElementById('detailPanel').style.display = 'none'; }
+</script>
+
+</content>
+</body>
+</html>

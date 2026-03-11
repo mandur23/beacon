@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<!-- KPI 카드 -->
+<div class="grid-4 mb16">
+    <div th:each="s : ${stats}" class="stat-card"
+         th:style="'border-color:' + ${s.color} + '33'">
+        <div th:style="'background:linear-gradient(90deg,transparent,' + ${s.color} + ',transparent)'"
+             class="stat-top-bar"></div>
+        <div class="stat-head">
+            <span class="stat-label" th:text="${s.label}"></span>
+            <span class="stat-icon" th:text="${s.icon}"></span>
+        </div>
+        <div class="stat-value" th:text="${s.value}"
+             th:style="'color:' + ${s.color}"
+             th:classappend="${s.blink} ? ' blink'"></div>
+        <div class="stat-sub" th:text="${s.sub}"></div>
+    </div>
+</div>
+
+<!-- 차트 + 점수 -->
+<div class="grid-12 mb16">
+    <div class="card span-8">
+        <div class="card-header">
+            <div>
+                <div class="card-title">24시간 위협 감지 현황</div>
+                <div class="card-sub">시간대별 공격 시도 집계</div>
+            </div>
+            <div class="legend">
+                <span class="legend-item red">● 감지</span>
+                <span class="legend-item accent">● 차단</span>
+            </div>
+        </div>
+        <div class="chart-area">
+            <canvas id="hourlyChart" height="80"></canvas>
+        </div>
+    </div>
+
+    <div class="card span-4">
+        <div class="card-header"><div class="card-title">보안 점수</div></div>
+        <div class="gauge-wrap">
+            <canvas id="gaugeChart" width="180" height="130"></canvas>
+        </div>
+        <div class="gauge-items">
+            <div class="gauge-row"><span class="gauge-key">방화벽</span><span class="green">● 정상</span></div>
+            <div class="gauge-row"><span class="gauge-key">IDS/IPS</span><span class="green">● 활성</span></div>
+            <div class="gauge-row"><span class="gauge-key">VPN</span><span class="green">● 정상</span></div>
+            <div class="gauge-row"><span class="gauge-key">백신</span><span class="yellow">● 업데이트 필요</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- 최근 이벤트 + 시간대 분포 -->
+<div class="grid-2 mb16">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <div class="card-title">최근 보안 이벤트</div>
+                <div class="card-sub">실시간 업데이트</div>
+            </div>
+            <span class="tag red">LIVE</span>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr><th>이벤트</th><th>유형</th><th>IP</th><th>위험도</th><th>시간</th></tr>
+                </thead>
+                <tbody>
+                    <tr th:each="e : ${recentEvents}">
+                        <td class="mono accent" th:text="${e.id}"></td>
+                        <td th:text="${e.type}"></td>
+                        <td class="mono dim" th:text="${e.ip}"></td>
+                        <td>
+                            <span class="badge"
+                                  th:text="${e.severityLabel}"
+                                  th:style="'color:' + ${e.severityColor} + ';background:' + ${e.severityColor} + '18;border-color:' + ${e.severityColor} + '44'">
+                            </span>
+                        </td>
+                        <td class="muted" th:text="${e.time}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">시간대별 공격 빈도</div>
+            <div class="card-sub">오늘 24시간</div>
+        </div>
+        <div class="bar-wrap">
+            <canvas id="barChart" height="80"></canvas>
+        </div>
+        <div class="bar-legend">
+            <span class="muted">00시</span>
+            <span class="red">▲ 피크 14~16시</span>
+            <span class="muted">23시</span>
+        </div>
+        <div class="grid-2-sm">
+            <div class="mini-stat">
+                <div class="mini-label">총 감지</div>
+                <div class="mini-value red" id="totalCount">-</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-label">최대 시간</div>
+                <div class="mini-value orange">14시 178건</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-label">평균/시간</div>
+                <div class="mini-value accent" id="avgCount">-</div>
+            </div>
+            <div class="mini-stat">
+                <div class="mini-label">차단율</div>
+                <div class="mini-value green">96.2%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const hourlyData = /*[[${hourlyData}]]*/ [];
+    const currentHour = new Date().getHours();
+
+    // 총계 / 평균
+    const total = hourlyData.reduce((a, b) => a + b, 0);
+    document.getElementById('totalCount').textContent = total.toLocaleString() + '건';
+    document.getElementById('avgCount').textContent = Math.round(total / 24) + '건';
+
+    // 24시간 라인 차트
+    drawLineChart('hourlyChart', hourlyData, currentHour);
+
+    // 바 차트
+    drawBarChart('barChart', hourlyData, currentHour);
+
+    // 게이지
+    drawGauge('gaugeChart', 87);
+</script>
+
+</content>
+</body>
+</html>

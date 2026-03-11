@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="layout(content)">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title th:text="${pageTitle} + ' · Beacon'">Beacon</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}"/>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo" onclick="toggleSidebar()">
+        <div class="logo-icon">🛡</div>
+        <div class="logo-text">
+            <div class="logo-title">BEACON</div>
+            <div class="logo-sub">ADMIN CONSOLE</div>
+        </div>
+    </div>
+    <div class="live-badge">
+        <span class="blink-dot">●</span>
+        LIVE MONITORING
+    </div>
+    <nav class="sidebar-nav">
+        <a th:href="@{/dashboard}" th:classappend="${page == 'dashboard'} ? ' active'" class="nav-item">
+            <span class="nav-icon">◈</span><span class="nav-label">대시보드</span>
+        </a>
+        <a th:href="@{/threats}" th:classappend="${page == 'threats'} ? ' active'" class="nav-item">
+            <span class="nav-icon">⚠</span><span class="nav-label">위협 / 이벤트</span>
+            <span class="nav-badge" th:if="${navBadgeCount != null and navBadgeCount > 0}" th:text="${navBadgeCount}"></span>
+        </a>
+        <a th:href="@{/network}" th:classappend="${page == 'network'} ? ' active'" class="nav-item">
+            <span class="nav-icon">⬡</span><span class="nav-label">네트워크</span>
+        </a>
+        <a th:href="@{/access}" th:classappend="${page == 'access'} ? ' active'" class="nav-item">
+            <span class="nav-icon">◎</span><span class="nav-label">접근 제어</span>
+        </a>
+        <a th:href="@{/firewall}" th:classappend="${page == 'firewall'} ? ' active'" class="nav-item">
+            <span class="nav-icon">⊞</span><span class="nav-label">방화벽 / 정책</span>
+        </a>
+        <a th:href="@{/reports}" th:classappend="${page == 'reports'} ? ' active'" class="nav-item">
+            <span class="nav-icon">◧</span><span class="nav-label">보고서 / 분석</span>
+        </a>
+    </nav>
+    <div class="sidebar-sys">
+        <div class="sys-title">SYSTEM</div>
+        <div class="sys-row"><span>CPU</span><span class="sys-val accent" id="sysCpu">--</span></div>
+        <div class="sys-bar"><div class="sys-bar-fill accent" id="sysCpuBar" style="width:0%"></div></div>
+        <div class="sys-row"><span>MEM</span><span class="sys-val yellow" id="sysMem">--</span></div>
+        <div class="sys-bar"><div class="sys-bar-fill yellow" id="sysMemBar" style="width:0%"></div></div>
+        <div class="sys-row"><span>NET</span><span class="sys-val green" id="sysNet">--</span></div>
+        <div class="sys-bar"><div class="sys-bar-fill green" id="sysNetBar" style="width:0%"></div></div>
+    </div>
+</aside>
+
+<div class="main-wrap" id="mainWrap">
+    <header class="top-header">
+        <div>
+            <h1 class="header-title" th:text="${pageTitle}">대시보드</h1>
+            <p class="header-sub">
+                <span id="headerDate"></span>
+                <span class="accent" id="headerTime"></span>
+                &nbsp;· KST
+            </p>
+        </div>
+        <div class="header-right">
+            <div class="threat-badge">
+                <span class="ping-dot"></span>
+                위협 감지 활성
+            </div>
+            <form th:action="@{/logout}" method="post" style="margin:0">
+                <button type="submit" class="btn-icon" title="로그아웃">⏻</button>
+            </form>
+            <div class="avatar">관</div>
+        </div>
+    </header>
+    <main class="content">
+        <th:block th:replace="${content}"/>
+    </main>
+</div>
+
+<script th:src="@{/js/main.js}"></script>
+</body>
+</html>

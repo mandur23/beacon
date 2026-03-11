@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<div class="grid-4 mb16">
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">전체 규칙</div>
+        <div class="stat-value accent" th:text="${ruleStats.total}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">활성</div>
+        <div class="stat-value green" th:text="${ruleStats.enabled}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">비활성</div>
+        <div class="stat-value dim" th:text="${ruleStats.disabled}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">총 히트</div>
+        <div class="stat-value yellow" th:text="${#numbers.formatInteger(ruleStats.totalHits,1,'DEFAULT')}"></div>
+    </div>
+</div>
+
+<div class="card mb16">
+    <div class="card-header">
+        <div>
+            <div class="card-title">방화벽 규칙</div>
+            <div class="card-sub">우선순위 기준 정렬</div>
+        </div>
+        <button class="btn-sm accent" onclick="openAddRuleModal()">+ 규칙 추가</button>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>순위</th><th>ID</th><th>규칙 이름</th><th>동작</th><th>소스</th><th>목적지</th><th>포트</th><th>히트 수</th><th>상태</th><th>제어</th></tr>
+            </thead>
+            <tbody>
+                <tr th:each="r : ${rules}"
+                    th:style="${!r.enabled} ? 'opacity:0.45' : ''">
+                    <td class="mono dim" style="text-align:center" th:text="${r.priority}"></td>
+                    <td class="mono accent" th:text="${r.id}"></td>
+                    <td style="font-weight:500" th:text="${r.name}"></td>
+                    <td>
+                        <span class="tag"
+                              th:text="${r.actionLabel}"
+                              th:style="'color:' + ${r.actionColor} + ';background:' + ${r.actionColor} + '18;border-color:' + ${r.actionColor} + '44'">
+                        </span>
+                    </td>
+                    <td class="mono dim" style="font-size:10px" th:text="${r.src}"></td>
+                    <td class="mono dim" style="font-size:10px" th:text="${r.dst}"></td>
+                    <td class="mono dim" style="font-size:10px" th:text="${r.port}"></td>
+                    <td class="mono yellow" th:text="${#numbers.formatInteger(r.hits,1,'DEFAULT')}"></td>
+                    <td>
+                        <span class="tag"
+                              th:text="${r.enabled} ? '활성' : '비활성'"
+                              th:style="${r.enabled} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#4a5570;background:#4a557018;border-color:#4a557044'">
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn-sm"
+                                th:text="${r.enabled} ? '비활성화' : '활성화'"
+                                th:style="${r.enabled} ? 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44' : 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044'"
+                                th:data-id="${r.dbId}"
+                                onclick="toggleRule(this)">
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">보안 정책 요약</div>
+        <div class="card-sub">현재 적용 중인 전체 정책</div>
+    </div>
+    <div class="grid-3" style="padding:16px 20px;gap:12px">
+        <div th:each="p : ${policies}" class="policy-card"
+             th:style="'border-color:' + ${p.color} + '33'">
+            <div class="policy-title" th:text="${p.title}"
+                 th:style="'color:' + ${p.color}"></div>
+            <div class="policy-desc" th:text="${p.desc}"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleRule(btn) {
+    const id = btn.dataset.id;
+    fetch('/api/firewall/toggle/' + id, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, 'info');
+            location.reload();
+        })
+        .catch(() => showToast('규칙 변경 중 오류가 발생했습니다', 'error'));
+}
+
+function openAddRuleModal() {
+    showToast('규칙 추가 기능은 준비 중입니다', 'info');
+}
+</script>
+
+</content>
+</body>
+</html>

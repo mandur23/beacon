@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<div class="grid-4 mb16">
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">이번 달 차단</div>
+        <div class="stat-value red" th:text="${reportStats.blocked}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">평균 보안 점수</div>
+        <div class="stat-value green" th:text="${reportStats.score}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">사고 해결률</div>
+        <div class="stat-value accent" th:text="${reportStats.resolveRate}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">평균 대응시간</div>
+        <div class="stat-value yellow" th:text="${reportStats.responseTime}"></div>
+    </div>
+</div>
+
+<div class="grid-2 mb16">
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">월별 보안 점수 추이</div>
+            <div class="card-sub">최근 12개월</div>
+        </div>
+        <div style="padding:16px 20px">
+            <canvas id="monthlyChart" height="90"></canvas>
+            <div style="display:flex;justify-content:space-between;margin-top:6px">
+                <th:block th:each="m : ${ {'1월','4월','7월','10월','12월'} }">
+                    <span class="muted" style="font-size:9px" th:text="${m}"></span>
+                </th:block>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">위협 유형 분포</div>
+            <div class="card-sub">이번 달 기준</div>
+        </div>
+        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+            <div th:each="t : ${threatDistribution}">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                    <span class="dim" th:text="${t.label}"></span>
+                    <span class="mono" th:text="${t.pct} + '%'"
+                          th:style="'color:' + ${t.color}"></span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill"
+                         th:style="'width:' + ${t.pct} + '%;background:' + ${t.color}"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="card-title">보안 사고 이력</div>
+            <div class="card-sub">최근 처리된 주요 사고</div>
+        </div>
+        <a href="/api/reports/export" class="btn-sm accent" download>보고서 내보내기 (CSV)</a>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>사고 ID</th><th>제목</th><th>심각도</th><th>발생일</th><th>대응시간</th><th>처리자</th><th>상태</th></tr>
+            </thead>
+            <tbody>
+                <tr th:each="inc : ${incidents}"
+                    onmouseenter="this.style.background='var(--surface2)'"
+                    onmouseleave="this.style.background='transparent'"
+                    style="cursor:pointer">
+                    <td class="mono accent" th:text="${inc.id}"></td>
+                    <td style="font-weight:500" th:text="${inc.title}"></td>
+                    <td>
+                        <span class="badge"
+                              th:text="${inc.severity == 'critical'} ? '위급' : (${inc.severity == 'high'} ? '높음' : '중간')"
+                              th:style="${inc.severity == 'critical'} ? 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44' :
+                                         (${inc.severity == 'high'} ? 'color:#ff8c42;background:#ff8c4218;border-color:#ff8c4244' :
+                                          'color:#ffd166;background:#ffd16618;border-color:#ffd16644')">
+                        </span>
+                    </td>
+                    <td class="mono dim" th:text="${inc.date}"></td>
+                    <td class="mono green" th:text="${inc.response}"></td>
+                    <td class="dim" th:text="${inc.handler}"></td>
+                    <td><span class="tag" style="color:#06d6a0;background:#06d6a018;border-color:#06d6a044" th:text="${inc.status}"></span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    const scores = /*[[${monthlyScores}]]*/ [];
+    drawMonthlyChart('monthlyChart', scores);
+</script>
+
+</content>
+</body>
+</html>

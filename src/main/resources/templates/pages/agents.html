@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<div class="grid-3 mb16">
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">전체 에이전트</div>
+        <div class="stat-value accent" th:text="${agentStats.total}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">온라인</div>
+        <div class="stat-value green" th:text="${agentStats.online}"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+        <div class="stat-label mb8">오프라인</div>
+        <div class="stat-value red" th:text="${agentStats.offline}"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <div class="card-title">에이전트 목록</div>
+            <div class="card-sub">모니터링 대상 PC 관리</div>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button class="btn-sm accent" onclick="refreshStatus()">🔄 새로고침</button>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>에이전트명</th>
+                    <th>호스트명</th>
+                    <th>IP 주소</th>
+                    <th>OS</th>
+                    <th>사용자</th>
+                    <th>버전</th>
+                    <th>상태</th>
+                    <th>마지막 연결</th>
+                    <th>이벤트</th>
+                    <th>트래픽</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="a : ${agents}" class="agent-row"
+                    th:data-dbid="${a.dbId}"
+                    th:data-id="${a.id}"
+                    th:data-agentname="${a.agentName}"
+                    th:data-hostname="${a.hostname}"
+                    th:data-ipaddress="${a.ipAddress}"
+                    th:data-ostype="${a.osType}"
+                    th:data-osversion="${a.osVersion}"
+                    th:data-agentversion="${a.agentVersion}"
+                    th:data-username="${a.username}"
+                    th:data-status="${a.status}"
+                    th:data-statuslabel="${a.statusLabel}"
+                    th:data-statuscolor="${a.statusColor}"
+                    th:data-lastheartbeat="${a.lastHeartbeat}"
+                    th:data-registeredat="${a.registeredAt}"
+                    th:data-totalevents="${a.totalEvents}"
+                    th:data-totaltrafficlogs="${a.totalTrafficLogs}">
+                    <td class="mono accent" th:text="${a.id}"></td>
+                    <td style="font-weight:600" th:text="${a.agentName}"></td>
+                    <td class="dim" th:text="${a.hostname}"></td>
+                    <td class="mono dim" th:text="${a.ipAddress}"></td>
+                    <td>
+                        <div style="font-size:11px">
+                            <div th:text="${a.osType}"></div>
+                            <div class="muted" th:text="${a.osVersion}"></div>
+                        </div>
+                    </td>
+                    <td class="dim" th:text="${a.username}"></td>
+                    <td class="mono dim" style="font-size:10px" th:text="${a.agentVersion}"></td>
+                    <td>
+                        <span style="display:flex;align-items:center;gap:5px;font-size:10px"
+                              th:style="'display:flex;align-items:center;gap:5px;font-size:10px;color:' + ${a.statusColor}">
+                            <span class="dot" 
+                                  th:style="'background:' + ${a.statusColor}"
+                                  th:classappend="${a.status == 'online'} ? 'blink' : ''"></span>
+                            <span th:text="${a.statusLabel}"></span>
+                        </span>
+                    </td>
+                    <td class="muted" style="font-size:10px" th:text="${a.lastHeartbeat}"></td>
+                    <td class="accent" th:text="${a.totalEvents}"></td>
+                    <td class="accent" th:text="${a.totalTrafficLogs}"></td>
+                    <td>
+                        <button class="btn-sm dim detail-btn" th:onclick="'showAgentDetail(' + ${a.dbId} + ')'">상세</button>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(agents)}">
+                    <td colspan="12" style="text-align:center;padding:40px;color:#6b7280">
+                        등록된 에이전트가 없습니다<br/>
+                        <small class="muted">BeaconGuardian을 실행하면 자동으로 등록됩니다</small>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 상세 패널 -->
+<div id="detailPanel" class="card" style="display:none;margin-top:14px">
+    <div class="card-header">
+        <div class="card-title">에이전트 상세 정보</div>
+        <button onclick="closeDetail()" class="btn-icon">×</button>
+    </div>
+    <div style="padding:16px 20px">
+        <div id="detailContent"></div>
+    </div>
+</div>
+
+<script th:inline="none">
+function showAgentDetail(dbId) {
+    const row = document.querySelector(`.agent-row[data-dbid="${dbId}"]`);
+    const d = row.dataset;
+    
+    document.getElementById('detailPanel').style.display = 'block';
+    
+    const statusIcon = d.status === 'online' ? '🟢' : '🔴';
+    
+    document.getElementById('detailContent').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div class="card" style="padding:12px;background:#0d1520">
+                <div class="muted mb8">에이전트 ID</div>
+                <div class="mono accent" style="font-size:14px">${d.id}</div>
+            </div>
+            <div class="card" style="padding:12px;background:#0d1520">
+                <div class="muted mb8">상태</div>
+                <div style="color:${d.statuscolor};font-weight:600">${statusIcon} ${d.statuslabel}</div>
+            </div>
+        </div>
+        
+        <div class="detail-row"><span class="dim">에이전트명</span><span class="mono">${d.agentname}</span></div>
+        <div class="detail-row"><span class="dim">호스트명</span><span class="mono">${d.hostname}</span></div>
+        <div class="detail-row"><span class="dim">IP 주소</span><span class="mono accent">${d.ipaddress}</span></div>
+        <div class="detail-row"><span class="dim">운영체제</span><span>${d.ostype} ${d.osversion}</span></div>
+        <div class="detail-row"><span class="dim">사용자</span><span>${d.username}</span></div>
+        <div class="detail-row"><span class="dim">에이전트 버전</span><span class="mono">${d.agentversion}</span></div>
+        <div class="detail-row"><span class="dim">등록일시</span><span>${d.registeredat}</span></div>
+        <div class="detail-row"><span class="dim">마지막 연결</span><span>${d.lastheartbeat}</span></div>
+        <div class="detail-row"><span class="dim">총 이벤트</span><span class="accent">${d.totalevents}건</span></div>
+        <div class="detail-row"><span class="dim">총 트래픽 로그</span><span class="accent">${d.totaltrafficlogs}건</span></div>
+        
+        <div class="detail-actions" style="margin-top:16px">
+            <button class="btn-danger" onclick="deleteAgent(${dbId})">에이전트 삭제</button>
+            ${d.status === 'offline' ? '<button class="btn-sm dim" disabled>오프라인 상태</button>' : ''}
+        </div>
+        
+        ${d.status === 'offline' ? '<div class="alert alert-warn" style="margin-top:12px">⚠ 에이전트가 5분 이상 응답하지 않습니다</div>' : ''}
+    `;
+    
+    document.getElementById('detailPanel').scrollIntoView({behavior:'smooth'});
+}
+
+function closeDetail() {
+    document.getElementById('detailPanel').style.display = 'none';
+}
+
+function deleteAgent(dbId) {
+    if (!confirm('정말로 이 에이전트를 삭제하시겠습니까?\n\n에이전트를 다시 실행하면 자동으로 재등록됩니다.')) return;
+    
+    fetch(`/api/agents/${dbId}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) {
+                closeDetail();
+                location.reload();
+            }
+        })
+        .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+function refreshStatus() {
+    showToast('에이전트 상태를 갱신합니다...', 'info');
+    location.reload();
+}
+
+// 자동 새로고침 (30초마다)
+setInterval(() => {
+    console.log('Auto-refreshing agent status...');
+    location.reload();
+}, 30000);
+</script>
+
+</content>
+</body>
+</html>

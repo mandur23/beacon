@@ -21,10 +21,21 @@ import java.util.Map;
 public class SecurityEventService {
     
     private final SecurityEventRepository securityEventRepository;
+    private final AgentService agentService;
     
     @Transactional
     public SecurityEvent createEvent(SecurityEvent event) {
-        return securityEventRepository.save(event);
+        SecurityEvent saved = securityEventRepository.save(event);
+        
+        if (event.getSourceIp() != null) {
+            try {
+                agentService.incrementEventCountByIp(event.getSourceIp());
+            } catch (Exception e) {
+                log.warn("Failed to increment agent event count: {}", e.getMessage());
+            }
+        }
+        
+        return saved;
     }
     
     @Transactional(readOnly = true)

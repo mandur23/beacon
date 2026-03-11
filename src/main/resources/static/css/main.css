@@ -480,3 +480,60 @@ button { font-family: inherit; cursor: pointer; }
 /* ── 애니메이션 ────────────────────────────────────────────── */
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 @keyframes ping  { 75%,100%{transform:scale(2);opacity:0} }
+
+/* ── 추가: 에이전트 관련 ────────────────────────────────────── */
+.stat-label {
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+}
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a2332;
+}
+.detail-row:last-child { border-bottom: none; }
+
+.detail-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.btn-danger {
+    padding: 8px 16px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.btn-danger:hover { background: #d32f2f; }
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+.btn-icon:hover { color: var(--accent); }
+
+.dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.dot.blink { animation: blink 1.5s infinite; }

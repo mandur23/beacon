@@ -36,6 +36,9 @@
         <a th:href="@{/access}" th:classappend="${page == 'access'} ? ' active'" class="nav-item">
             <span class="nav-icon">◎</span><span class="nav-label">접근 제어</span>
         </a>
+        <a th:href="@{/agents}" th:classappend="${page == 'agents'} ? ' active'" class="nav-item">
+            <span class="nav-icon">◫</span><span class="nav-label">에이전트</span>
+        </a>
         <a th:href="@{/firewall}" th:classappend="${page == 'firewall'} ? ' active'" class="nav-item">
             <span class="nav-icon">⊞</span><span class="nav-label">방화벽 / 정책</span>
         </a>

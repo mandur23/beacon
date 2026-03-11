@@ -1,9 +1,11 @@
 package com.example.beacon.controller;
 
+import com.example.beacon.entity.Agent;
 import com.example.beacon.entity.FirewallRule;
 import com.example.beacon.entity.SecurityEvent;
 import com.example.beacon.entity.User;
 import com.example.beacon.repository.UserRepository;
+import com.example.beacon.service.AgentService;
 import com.example.beacon.service.FirewallService;
 import com.example.beacon.service.SecurityEventService;
 import com.example.beacon.service.TrafficAnalysisService;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +33,7 @@ public class DashboardController {
     private final UserSessionService userSessionService;
     private final FirewallService firewallService;
     private final UserRepository userRepository;
+    private final AgentService agentService;
 
     @GetMapping({"/", "/dashboard"})
     public String dashboard(Model model) {
@@ -184,6 +188,30 @@ public class DashboardController {
     public String login() {
         return "login";
     }
+    
+    @GetMapping("/agents")
+    public String agents(Model model) {
+        model.addAttribute("page", "agents");
+        model.addAttribute("pageTitle", "에이전트 관리");
+        
+        agentService.updateAgentStatus();
+        
+        List<Agent> allAgents = agentService.getAllAgents();
+        Long onlineCount = agentService.getOnlineAgentCount();
+        
+        Map<String, Object> agentStats = new LinkedHashMap<>();
+        agentStats.put("total", allAgents.size());
+        agentStats.put("online", onlineCount);
+        agentStats.put("offline", allAgents.size() - onlineCount);
+        model.addAttribute("agentStats", agentStats);
+        
+        List<Map<String, Object>> agents = allAgents.stream()
+                .map(this::toAgentMap)
+                .collect(Collectors.toList());
+        model.addAttribute("agents", agents);
+        
+        return "pages/agents";
+    }
 
     // ── 변환 헬퍼 ──────────────────────────────────────────────────
 
@@ -300,6 +328,51 @@ public class DashboardController {
         m.put("response", duration);
         m.put("handler", e.getHandledBy() != null ? e.getHandledBy() : "시스템");
         m.put("status", "처리완료");
+        return m;
+    }
+    
+    private Map<String, Object> toAgentMap(Agent a) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        
+        String status = a.getStatus() != null ? a.getStatus() : "offline";
+        String statusLabel = switch (status) {
+            case "online" -> "온라인";
+            case "offline" -> "오프라인";
+            case "error" -> "오류";
+            default -> status;
+        };
+        String statusColor = switch (status) {
+            case "online" -> "#06d6a0";
+            case "offline" -> "#ff3d5a";
+            case "error" -> "#ff8c42";
+            default -> "#4a5570";
+        };
+        
+        String lastHeartbeat = a.getLastHeartbeat() != null 
+                ? a.getLastHeartbeat().format(formatter)
+                : "없음";
+        String registeredAt = a.getRegisteredAt() != null
+                ? a.getRegisteredAt().format(formatter)
+                : "";
+        
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("dbId", a.getId());
+        m.put("id", "AG-" + a.getId());
+        m.put("agentName", a.getAgentName());
+        m.put("hostname", a.getHostname());
+        m.put("ipAddress", a.getIpAddress());
+        m.put("osType", a.getOsType() != null ? a.getOsType() : "Unknown");
+        m.put("osVersion", a.getOsVersion() != null ? a.getOsVersion() : "");
+        m.put("agentVersion", a.getAgentVersion() != null ? a.getAgentVersion() : "1.0.0");
+        m.put("username", a.getUsername() != null ? a.getUsername() : "Unknown");
+        m.put("status", status);
+        m.put("statusLabel", statusLabel);
+        m.put("statusColor", statusColor);
+        m.put("lastHeartbeat", lastHeartbeat);
+        m.put("registeredAt", registeredAt);
+        m.put("totalEvents", a.getTotalEvents());
+        m.put("totalTrafficLogs", a.getTotalTrafficLogs());
+        
         return m;
     }
 }

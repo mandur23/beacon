@@ -32,4 +32,6 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     
     @Query("SELECT COUNT(a) FROM Agent a WHERE a.lastHeartbeat > :since")
     Long countActiveAgents(@Param("since") LocalDateTime since);
+
+    List<Agent> findByStatusAndLastHeartbeatBefore(String status, LocalDateTime threshold);
 }

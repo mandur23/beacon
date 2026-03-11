@@ -48,6 +48,24 @@ public class AgentController {
         }
     }
     
+    @PostMapping("/disconnect")
+    public ResponseEntity<Map<String, Object>> disconnect(@RequestBody AgentHeartbeatRequest request) {
+        try {
+            agentService.disconnectAgent(request.getAgentName());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Agent disconnected successfully");
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to disconnect agent: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
     @PostMapping("/heartbeat")
     public ResponseEntity<Map<String, Object>> heartbeat(@RequestBody AgentHeartbeatRequest request) {
         try {

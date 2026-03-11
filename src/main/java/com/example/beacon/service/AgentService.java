@@ -4,6 +4,7 @@ import com.example.beacon.entity.Agent;
 import com.example.beacon.repository.AgentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -123,25 +124,30 @@ public class AgentService {
         return agentRepository.countActiveAgents(threshold);
     }
     
+    @Scheduled(fixedRate = 60000)
     @Transactional
     public void updateAgentStatus() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(HEARTBEAT_TIMEOUT_MINUTES);
-        
-        List<Agent> onlineAgents = agentRepository.findOnlineAgents(threshold);
-        onlineAgents.forEach(agent -> {
-            if (!"online".equals(agent.getStatus())) {
-                agent.setStatus("online");
-                agentRepository.save(agent);
-            }
+
+        List<Agent> timedOutAgents = agentRepository.findByStatusAndLastHeartbeatBefore("online", threshold);
+        timedOutAgents.forEach(agent -> {
+            agent.setStatus("offline");
+            agentRepository.save(agent);
+            log.warn("Agent timed out, marked offline: {} (last heartbeat: {})",
+                    agent.getAgentName(), agent.getLastHeartbeat());
         });
-        
-        List<Agent> offlineAgents = agentRepository.findOfflineAgents(threshold);
-        offlineAgents.forEach(agent -> {
-            if (!"offline".equals(agent.getStatus())) {
-                agent.setStatus("offline");
-                agentRepository.save(agent);
-                log.warn("Agent went offline: {}", agent.getAgentName());
-            }
+
+        if (!timedOutAgents.isEmpty()) {
+            log.info("Offline status applied to {} agent(s)", timedOutAgents.size());
+        }
+    }
+
+    @Transactional
+    public void disconnectAgent(String agentName) {
+        agentRepository.findByAgentName(agentName).ifPresent(agent -> {
+            agent.setStatus("offline");
+            agentRepository.save(agent);
+            log.info("Agent explicitly disconnected: {}", agentName);
         });
     }
     

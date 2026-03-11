@@ -35,3 +35,28 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Python ###
+python-ml/__pycache__/
+python-ml/*.py[cod]
+python-ml/*$py.class
+python-ml/.Python
+python-ml/venv/
+python-ml/env/
+python-ml/ENV/
+python-ml/.venv
+python-ml/*.log
+
+### Application ###
+application-local.yaml
+application-prod.yaml
+*.log
+logs/
+
+### Database ###
+*.db
+*.sqlite
+
+### OS ###
+.DS_Store
+Thumbs.db

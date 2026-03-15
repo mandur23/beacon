@@ -276,6 +276,11 @@ button { font-family: inherit; cursor: pointer; }
   background: rgba(255,61,90,.08); border: 1px solid rgba(255,61,90,.2);
   border-radius: 6px; color: var(--red); font-size: 11px; font-family: inherit;
 }
+.btn-success {
+  flex: 1; padding: 8px;
+  background: rgba(6,214,160,.08); border: 1px solid rgba(6,214,160,.2);
+  border-radius: 6px; color: #06d6a0; font-size: 11px; font-family: inherit;
+}
 .btn-accent {
   flex: 1; padding: 8px;
   background: rgba(0,229,255,.08); border: 1px solid rgba(0,229,255,.2);
@@ -517,6 +522,18 @@ button { font-family: inherit; cursor: pointer; }
     transition: all 0.2s;
 }
 .btn-danger:hover { background: #d32f2f; }
+.btn-success {
+    padding: 8px 16px;
+    background: #06d6a0;
+    color: #0a0f16;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.btn-success:hover { background: #04b386; }
 
 .btn-icon {
     background: none;

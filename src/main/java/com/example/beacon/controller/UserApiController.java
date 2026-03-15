@@ -29,6 +29,17 @@ public class UserApiController {
         return ResponseEntity.ok(Map.of("success", true, "message", "'" + user.getName() + "' 계정이 잠금 처리되었습니다"));
     }
 
+    @PostMapping("/{id}/unlock")
+    public ResponseEntity<Map<String, Object>> unlockUser(@PathVariable Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found: " + id));
+        user.setEnabled(true);
+        user.setLockedUntil(null);
+        user.setLoginAttempts(0);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("success", true, "message", "'" + user.getName() + "' 계정이 잠금 해제되었습니다"));
+    }
+
     @PutMapping("/{id}/role")
     public ResponseEntity<Map<String, Object>> updateRole(
             @PathVariable Long id,

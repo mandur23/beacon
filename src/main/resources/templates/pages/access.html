@@ -173,7 +173,10 @@ document.querySelectorAll('.edit-btn').forEach(btn => {
                 `<div class="detail-row"><span class="dim">${k}</span><span class="mono">${v}</span></div>`
             ).join('')}
             <div class="detail-actions" style="margin-top:12px">
-                <button class="btn-danger" onclick="lockUser(${dbId})">계정 잠금</button>
+                ${d.status === 'active'
+                    ? `<button class="btn-danger" onclick="lockUser(${dbId})">계정 잠금</button>`
+                    : `<button class="btn-success" onclick="unlockUser(${dbId})">계정 해제</button>`
+                }
                 <button class="btn-accent" onclick="openPermModal(${dbId}, '${d.name}', '${d.role}')">권한 수정</button>
             </div>
             ${mfaWarn}
@@ -187,6 +190,17 @@ function closeEdit() { document.getElementById('editPanel').style.display = 'non
 function lockUser(dbId) {
     if (!confirm('정말로 이 계정을 잠금 처리하시겠습니까?')) return;
     fetch(`/api/users/${dbId}/lock`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) { closeEdit(); location.reload(); }
+        })
+        .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+function unlockUser(dbId) {
+    if (!confirm('이 계정의 잠금을 해제하시겠습니까?')) return;
+    fetch(`/api/users/${dbId}/unlock`, { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             showToast(data.message, data.success ? 'success' : 'error');

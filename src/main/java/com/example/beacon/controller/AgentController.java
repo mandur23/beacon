@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,8 +20,7 @@ public class AgentController {
     
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> registerAgent(@RequestBody AgentRegisterRequest request) {
-        try {
-            Agent agent = agentService.registerOrUpdateAgent(
+        Agent agent = agentService.registerOrUpdateAgent(
                 request.getAgentName(),
                 request.getHostname(),
                 request.getIpAddress(),
@@ -31,57 +29,25 @@ public class AgentController {
                 request.getAgentVersion(),
                 request.getUsername(),
                 request.getMetadata()
-            );
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Agent registered successfully");
-            response.put("agentId", agent.getId());
-            response.put("agentName", agent.getAgentName());
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Failed to register agent: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
-        }
+        );
+        return ResponseEntity.ok(Map.of(
+                "success",   true,
+                "message",   "Agent registered successfully",
+                "agentId",   agent.getId(),
+                "agentName", agent.getAgentName()
+        ));
     }
-    
+
     @PostMapping("/disconnect")
     public ResponseEntity<Map<String, Object>> disconnect(@RequestBody AgentHeartbeatRequest request) {
-        try {
-            agentService.disconnectAgent(request.getAgentName());
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Agent disconnected successfully");
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Failed to disconnect agent: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
-        }
+        agentService.disconnectAgent(request.getAgentName());
+        return ResponseEntity.ok(Map.of("success", true, "message", "Agent disconnected successfully"));
     }
 
     @PostMapping("/heartbeat")
     public ResponseEntity<Map<String, Object>> heartbeat(@RequestBody AgentHeartbeatRequest request) {
-        try {
-            agentService.updateHeartbeat(request.getAgentName());
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Heartbeat received");
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Failed to process heartbeat: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
-        }
+        agentService.updateHeartbeat(request.getAgentName());
+        return ResponseEntity.ok(Map.of("success", true, "message", "Heartbeat received"));
     }
     
     @GetMapping
@@ -103,30 +69,16 @@ public class AgentController {
     public ResponseEntity<Map<String, Object>> getAgentCounts() {
         List<Agent> allAgents = agentService.getAllAgents();
         Long onlineCount = agentService.getOnlineAgentCount();
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("total", allAgents.size());
-        response.put("online", onlineCount);
-        response.put("offline", allAgents.size() - onlineCount);
-        
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(Map.of(
+                "total",   allAgents.size(),
+                "online",  onlineCount,
+                "offline", allAgents.size() - onlineCount
+        ));
     }
     
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteAgent(@PathVariable Long id) {
-        try {
-            agentService.deleteAgent(id);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Agent deleted successfully");
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Failed to delete agent: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
-        }
+        agentService.deleteAgent(id);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Agent deleted successfully"));
     }
 }

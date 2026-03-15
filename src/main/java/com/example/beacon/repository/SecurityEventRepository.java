@@ -48,4 +48,29 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
 
     @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE e.status = 'pending' OR e.status = '조사중'")
     Long countUnresolvedEvents();
+
+    @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE e.resolvedAt IS NOT NULL")
+    Long countResolvedEvents();
+
+    /** 해결된 이벤트의 평균 처리 시간 (분 단위, MySQL TIMESTAMPDIFF) */
+    @Query("SELECT AVG(TIMESTAMPDIFF(MINUTE, e.createdAt, e.resolvedAt)) " +
+           "FROM SecurityEvent e WHERE e.resolvedAt IS NOT NULL")
+    Double averageResolutionMinutes();
+
+    /** 미해결 이벤트를 severity별로 집계 */
+    @Query("SELECT COUNT(e) FROM SecurityEvent e " +
+           "WHERE e.severity = :severity AND (e.status = 'pending' OR e.status = '조사중')")
+    Long countUnresolvedBySeverity(@Param("severity") String severity);
+
+    /** 기간 내 이벤트 유형별 건수 (내림차순) */
+    @Query("SELECT e.eventType, COUNT(e) FROM SecurityEvent e " +
+           "WHERE e.createdAt > :since GROUP BY e.eventType ORDER BY COUNT(e) DESC")
+    List<Object[]> countByEventTypeSince(@Param("since") LocalDateTime since);
+
+    /** 특정 월(start~end) 내 severity별 건수 – 월별 보안 점수 산출용 */
+    @Query("SELECT COUNT(e) FROM SecurityEvent e " +
+           "WHERE e.severity = :severity AND e.createdAt BETWEEN :start AND :end")
+    Long countBySeverityBetween(@Param("severity") String severity,
+                                @Param("start")    LocalDateTime start,
+                                @Param("end")      LocalDateTime end);
 }

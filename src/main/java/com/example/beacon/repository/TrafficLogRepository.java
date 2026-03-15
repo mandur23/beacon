@@ -30,4 +30,8 @@ public interface TrafficLogRepository extends JpaRepository<TrafficLog, Long> {
     
     @Query("SELECT t.protocol, COUNT(t), SUM(t.bytesTransferred) FROM TrafficLog t GROUP BY t.protocol")
     List<Object[]> getProtocolStatistics();
+
+    /** 기간 내 평균 연결 지속 시간 (ms) */
+    @Query("SELECT AVG(t.duration) FROM TrafficLog t WHERE t.timestamp > :since")
+    Double averageDurationSince(@Param("since") LocalDateTime since);
 }

@@ -1,6 +1,7 @@
 package com.example.beacon.controller;
 
 import com.example.beacon.entity.User;
+import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,7 @@ public class UserApiController {
     @PostMapping("/{id}/lock")
     public ResponseEntity<Map<String, Object>> lockUser(@PathVariable Long id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", id));
         user.setEnabled(false);
         user.setLockedUntil(LocalDateTime.now().plusDays(1));
         userRepository.save(user);
@@ -33,7 +34,7 @@ public class UserApiController {
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User", id));
         String newRole = body.get("role");
         if (newRole == null || newRole.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "역할을 선택해주세요"));

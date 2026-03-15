@@ -1,6 +1,7 @@
 package com.example.beacon.service;
 
 import com.example.beacon.entity.UserSession;
+import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.UserSessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,7 +74,7 @@ public class UserSessionService {
     @Transactional
     public void updateSessionRiskScore(Long sessionId, Double riskScore, String riskFactors) {
         UserSession session = userSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Session not found: " + sessionId));
+                .orElseThrow(() -> new ResourceNotFoundException("UserSession", sessionId));
         session.setRiskScore(riskScore);
         session.setRiskFactors(riskFactors);
         userSessionRepository.save(session);

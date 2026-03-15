@@ -7,6 +7,7 @@ import com.example.beacon.entity.User;
 import com.example.beacon.repository.UserRepository;
 import com.example.beacon.service.AgentService;
 import com.example.beacon.service.FirewallService;
+import com.example.beacon.service.NetworkStatsService;
 import com.example.beacon.service.SecurityEventService;
 import com.example.beacon.service.TrafficAnalysisService;
 import com.example.beacon.service.UserSessionService;
@@ -28,12 +29,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DashboardController {
 
-    private final SecurityEventService securityEventService;
+    private final SecurityEventService  securityEventService;
     private final TrafficAnalysisService trafficAnalysisService;
-    private final UserSessionService userSessionService;
-    private final FirewallService firewallService;
-    private final UserRepository userRepository;
-    private final AgentService agentService;
+    private final UserSessionService    userSessionService;
+    private final FirewallService       firewallService;
+    private final UserRepository        userRepository;
+    private final AgentService          agentService;
+    private final NetworkStatsService   networkStatsService;
 
     @GetMapping({"/", "/dashboard"})
     public String dashboard(Model model) {
@@ -46,10 +48,18 @@ public class DashboardController {
         long unresolvedCount = securityEventService.countUnresolvedEvents();
 
         List<Map<String, Object>> stats = new ArrayList<>();
-        stats.add(kpi("오늘 차단", "🛡", blockedToday, "차단된 이벤트", "#ff3d5a", false));
-        stats.add(kpi("활성 세션", "◎", activeSessions, "현재 접속 중", "#00e5ff", false));
-        stats.add(kpi("미해결 이벤트", "⚠", unresolvedCount, "즉시 검토 필요", "#ffd166", unresolvedCount > 0));
-        stats.add(kpi("보안 점수", "✓", "87", "양호 수준", "#06d6a0", false));
+        int securityScore = securityEventService.calculateSecurityScore();
+        String scoreLabel = securityScore >= 80 ? "양호 수준"
+                          : securityScore >= 60 ? "주의 필요"
+                          : "위험 수준";
+        String scoreColor = securityScore >= 80 ? "#06d6a0"
+                          : securityScore >= 60 ? "#ffd166"
+                          : "#ff3d5a";
+
+        stats.add(kpi("오늘 차단",    "🛡", blockedToday,    "차단된 이벤트",   "#ff3d5a", false));
+        stats.add(kpi("활성 세션",    "◎",  activeSessions,  "현재 접속 중",    "#00e5ff", false));
+        stats.add(kpi("미해결 이벤트","⚠",  unresolvedCount, "즉시 검토 필요",  "#ffd166", unresolvedCount > 0));
+        stats.add(kpi("보안 점수",    "✓",  securityScore,   scoreLabel,        scoreColor, false));
         model.addAttribute("stats", stats);
 
         List<Integer> hourlyData = securityEventService.getHourlyData();
@@ -87,25 +97,59 @@ public class DashboardController {
         model.addAttribute("tab", tab);
 
         LocalDateTime lastHour = LocalDateTime.now().minusHours(1);
-        long bandwidth = trafficAnalysisService.getTotalBytesTransferred(lastHour);
+        long bandwidth       = trafficAnalysisService.getTotalBytesTransferred(lastHour);
+        long activeSessions  = userSessionService.getActiveSessionCount();
+        long blockedLastHour = securityEventService.getBlockedEventsCount(lastHour);
+        String avgLatency    = trafficAnalysisService.getAverageLatency(lastHour);
+        int    latencyPct    = trafficAnalysisService.getAverageLatencyPct(lastHour);
+
+        // 대역폭 게이지: 1시간 기준 최대 1 GB 대비 백분율
+        int bwPct      = (int) Math.min(100, bandwidth * 100L / 1_073_741_824L);
+        // 세션 게이지: 최대 100 세션 기준
+        int sessionPct = (int) Math.min(100, activeSessions * 100L / 100L);
+        // 차단 게이지: 최대 200건 기준
+        int blockPct   = (int) Math.min(100, blockedLastHour * 100L / 200L);
+
         model.addAttribute("bandwidthLastHour", bandwidth);
         model.addAttribute("protocolStats", trafficAnalysisService.getProtocolStatistics());
         model.addAttribute("metrics", List.of(
-                Map.of("label", "대역폭(1시간)", "value", bandwidth, "color", "#00e5ff", "pct", 42),
-                Map.of("label", "활성 세션", "value", userSessionService.getActiveSessionCount(), "color", "#06d6a0", "pct", 58),
-                Map.of("label", "차단 이벤트", "value", securityEventService.getBlockedEventsCount(lastHour), "color", "#ff3d5a", "pct", 34),
-                Map.of("label", "평균 지연", "value", "22ms", "color", "#ffd166", "pct", 27)
+                Map.of("label", "대역폭(1시간)", "value", bandwidth,       "color", "#00e5ff", "pct", bwPct),
+                Map.of("label", "활성 세션",    "value", activeSessions,   "color", "#06d6a0", "pct", sessionPct),
+                Map.of("label", "차단 이벤트",  "value", blockedLastHour,  "color", "#ff3d5a", "pct", blockPct),
+                Map.of("label", "평균 지연",    "value", avgLatency,       "color", "#ffd166", "pct", latencyPct)
         ));
-        model.addAttribute("nodes", List.of(
-                Map.of("id", "FW-01", "label", "방화벽", "type", "firewall", "status", "ok"),
-                Map.of("id", "IDS-01", "label", "침입탐지", "type", "sensor", "status", "ok"),
-                Map.of("id", "WEB-01", "label", "웹서버", "type", "server", "status", "ok"),
-                Map.of("id", "DB-01", "label", "DB서버", "type", "server", "status", "warn")
-        ));
-        model.addAttribute("interfaces", List.of(
-                Map.of("name", "eth0", "ip", "10.0.0.10", "speed", "1Gbps", "tx", "124MB/s", "rx", "98MB/s", "packets", "143212", "errors", "0", "status", "up"),
-                Map.of("name", "eth1", "ip", "172.16.0.10", "speed", "1Gbps", "tx", "74MB/s", "rx", "112MB/s", "packets", "102442", "errors", "1", "status", "up")
-        ));
+
+        // 토폴로지 노드: 등록된 에이전트 기반, 없을 경우 안내 노드 표시
+        agentService.updateAgentStatus();
+        List<Agent> agentsForTopology = agentService.getAllAgents();
+        List<Map<String, Object>> nodes;
+        if (agentsForTopology.isEmpty()) {
+            nodes = List.of(Map.of("id", "SERVER-01", "label", "서버", "type", "server", "status", "ok"));
+        } else {
+            nodes = agentsForTopology.stream()
+                    .map(a -> {
+                        String nodeStatus = switch (a.getStatus() != null ? a.getStatus() : "offline") {
+                            case "online"  -> "ok";
+                            case "error"   -> "error";
+                            default        -> "warn";
+                        };
+                        String label = a.getAgentName() != null ? a.getAgentName()
+                                     : a.getHostname()  != null ? a.getHostname()
+                                     : "AG-" + a.getId();
+                        return Map.<String, Object>of(
+                                "id",     "AG-" + a.getId(),
+                                "label",  label,
+                                "type",   "server",
+                                "status", nodeStatus
+                        );
+                    })
+                    .collect(Collectors.toList());
+        }
+        model.addAttribute("nodes", nodes);
+
+        // 인터페이스: 서버의 실제 NIC 목록
+        List<Map<String, Object>> ifaces = networkStatsService.getNetworkInterfaces();
+        model.addAttribute("interfaces", ifaces);
 
         return "pages/network";
     }
@@ -162,24 +206,19 @@ public class DashboardController {
         long blockedLastMonth = securityEventService.getBlockedEventsCount(lastMonth);
 
         Map<String, Object> reportStats = new LinkedHashMap<>();
-        reportStats.put("blocked", blockedLastMonth);
-        reportStats.put("score", "87");
-        reportStats.put("resolveRate", "96%");
-        reportStats.put("responseTime", "12분");
+        reportStats.put("blocked",      blockedLastMonth);
+        reportStats.put("score",        securityEventService.calculateSecurityScore());
+        reportStats.put("resolveRate",  securityEventService.getResolveRate());
+        reportStats.put("responseTime", securityEventService.getAverageResponseTime());
         model.addAttribute("reportStats", reportStats);
 
         model.addAttribute("severityDistribution", securityEventService.getSeverityCounts());
-        model.addAttribute("threatDistribution", List.of(
-                Map.of("label", "Brute Force", "pct", 34, "color", "#ff3d5a"),
-                Map.of("label", "SQL Injection", "pct", 24, "color", "#ff8c42"),
-                Map.of("label", "XSS", "pct", 18, "color", "#ffd166"),
-                Map.of("label", "기타", "pct", 24, "color", "#00e5ff")
-        ));
+        model.addAttribute("threatDistribution",   securityEventService.getThreatDistribution());
 
         List<Map<String, Object>> incidents = securityEventService.getRecentResolved()
                 .stream().map(this::toIncidentMap).collect(Collectors.toList());
-        model.addAttribute("incidents", incidents);
-        model.addAttribute("monthlyScores", List.of(75, 77, 79, 80, 81, 83, 84, 84, 85, 86, 87, 87));
+        model.addAttribute("incidents",    incidents);
+        model.addAttribute("monthlyScores", securityEventService.getMonthlyScores(12));
 
         return "pages/reports";
     }

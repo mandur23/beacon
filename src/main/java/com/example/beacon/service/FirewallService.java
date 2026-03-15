@@ -1,6 +1,7 @@
 package com.example.beacon.service;
 
 import com.example.beacon.entity.FirewallRule;
+import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.FirewallRuleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,7 @@ public class FirewallService {
     @Transactional
     public FirewallRule toggleRule(Long id) {
         FirewallRule rule = firewallRuleRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Rule not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("FirewallRule", id));
         rule.setEnabled(!rule.getEnabled());
         return firewallRuleRepository.save(rule);
     }

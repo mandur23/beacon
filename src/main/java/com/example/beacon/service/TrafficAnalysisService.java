@@ -1,6 +1,7 @@
 package com.example.beacon.service;
 
 import com.example.beacon.entity.TrafficLog;
+import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.TrafficLogRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +23,27 @@ public class TrafficAnalysisService {
     
     private final TrafficLogRepository trafficLogRepository;
     private final ObjectMapper objectMapper;
-    
+    private final AgentService agentService;
+
+    /**
+     * 트래픽 로그를 저장하고, sourceIp로 식별되는 에이전트의
+     * totalTrafficLogs 카운터를 1 증가시킨다.
+     * 에이전트 연동 실패는 로그만 남기고 저장 결과에 영향을 주지 않는다.
+     */
     @Transactional
     public TrafficLog logTraffic(TrafficLog trafficLog) {
-        return trafficLogRepository.save(trafficLog);
+        TrafficLog saved = trafficLogRepository.save(trafficLog);
+
+        if (trafficLog.getSourceIp() != null) {
+            try {
+                agentService.incrementTrafficCountByIp(trafficLog.getSourceIp());
+            } catch (Exception e) {
+                log.warn("Failed to increment agent traffic count for ip={}: {}",
+                        trafficLog.getSourceIp(), e.getMessage());
+            }
+        }
+
+        return saved;
     }
     
     @Transactional(readOnly = true)
@@ -81,13 +99,36 @@ public class TrafficAnalysisService {
     @Transactional
     public TrafficLog markAsAnomaly(Long trafficId, Double score, String reason) {
         TrafficLog traffic = trafficLogRepository.findById(trafficId)
-                .orElseThrow(() -> new RuntimeException("Traffic log not found: " + trafficId));
+                .orElseThrow(() -> new ResourceNotFoundException("TrafficLog", trafficId));
         traffic.setIsAnomaly(true);
         traffic.setAnomalyScore(score);
         traffic.setAnomalyReason(reason);
         return trafficLogRepository.save(traffic);
     }
     
+    /**
+     * 기간 내 평균 연결 지속 시간을 "Xms" / "Xs" 형식 문자열로 반환한다.
+     * 데이터 없을 경우 "N/A" 반환.
+     */
+    @Transactional(readOnly = true)
+    public String getAverageLatency(LocalDateTime since) {
+        Double avg = trafficLogRepository.averageDurationSince(since);
+        if (avg == null) return "N/A";
+        long ms = Math.round(avg);
+        return ms < 1000 ? ms + "ms" : String.format("%.1fs", ms / 1000.0);
+    }
+
+    /**
+     * 평균 지연 값을 0~100 % 게이지용 정수로 반환한다.
+     * 기준: 100ms = 100%
+     */
+    @Transactional(readOnly = true)
+    public int getAverageLatencyPct(LocalDateTime since) {
+        Double avg = trafficLogRepository.averageDurationSince(since);
+        if (avg == null) return 0;
+        return (int) Math.min(100, Math.round(avg / 100.0 * 100.0));
+    }
+
     public Map<String, Object> analyzeTrafficPattern(List<TrafficLog> logs) {
         Map<String, Object> analysis = new HashMap<>();
         

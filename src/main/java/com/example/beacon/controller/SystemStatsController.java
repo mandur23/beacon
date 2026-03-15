@@ -1,5 +1,6 @@
 package com.example.beacon.controller;
 
+import com.example.beacon.service.NetworkStatsService;
 import com.sun.management.OperatingSystemMXBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,12 @@ import java.util.Map;
 @RequestMapping("/api/system")
 public class SystemStatsController {
 
+    private final NetworkStatsService networkStatsService;
+
+    public SystemStatsController(NetworkStatsService networkStatsService) {
+        this.networkStatsService = networkStatsService;
+    }
+
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Integer>> getStats() {
         OperatingSystemMXBean osBean =
@@ -22,10 +29,10 @@ public class SystemStatsController {
         int cpu = cpuLoad >= 0 ? (int) Math.round(cpuLoad * 100) : 0;
 
         long totalMem = osBean.getTotalMemorySize();
-        long freeMem = osBean.getFreeMemorySize();
+        long freeMem  = osBean.getFreeMemorySize();
         int mem = totalMem > 0 ? (int) Math.round((1.0 - (double) freeMem / totalMem) * 100) : 0;
 
-        int net = Math.min(100, (cpu / 3) + (int) (Math.random() * 15) + 5);
+        int net = networkStatsService.getUsagePercent();
 
         return ResponseEntity.ok(Map.of("cpu", cpu, "mem", mem, "net", net));
     }

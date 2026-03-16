@@ -38,7 +38,15 @@
             </thead>
             <tbody>
                 <tr th:each="r : ${rules}"
-                    th:style="${!r.enabled} ? 'opacity:0.45' : ''">
+                    th:style="${!r.enabled} ? 'opacity:0.45' : ''"
+                    th:data-dbid="${r.dbId}"
+                    th:data-name="${r.name}"
+                    th:data-action="${r.action}"
+                    th:data-src="${r.src}"
+                    th:data-dst="${r.dst}"
+                    th:data-port="${r.port}"
+                    th:data-priority="${r.priority}"
+                    th:data-description="${r.description}">
                     <td class="mono dim" style="text-align:center" th:text="${r.priority}"></td>
                     <td class="mono accent" th:text="${r.id}"></td>
                     <td style="font-weight:500" th:text="${r.name}"></td>
@@ -59,12 +67,18 @@
                         </span>
                     </td>
                     <td>
-                        <button class="btn-sm"
-                                th:text="${r.enabled} ? '비활성화' : '활성화'"
-                                th:style="${r.enabled} ? 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44' : 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044'"
-                                th:data-id="${r.dbId}"
-                                onclick="toggleRule(this)">
-                        </button>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap">
+                            <button class="btn-sm"
+                                    th:text="${r.enabled} ? '비활성화' : '활성화'"
+                                    th:style="${r.enabled} ? 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44' : 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044'"
+                                    th:data-id="${r.dbId}"
+                                    onclick="toggleRule(this)">
+                            </button>
+                            <button class="btn-sm dim" th:data-id="${r.dbId}" onclick="openEditModal(this.closest('tr'))">수정</button>
+                            <button class="btn-sm" style="color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44"
+                                    th:data-id="${r.dbId}" th:data-name="${r.name}"
+                                    onclick="deleteRule(this)">삭제</button>
+                        </div>
                     </td>
                 </tr>
             </tbody>
@@ -87,6 +101,103 @@
     </div>
 </div>
 
+<!-- 규칙 추가 모달 -->
+<div id="addRuleModal" class="modal-overlay" style="display:none">
+    <div class="card modal-box">
+        <div class="card-header">
+            <div class="card-title">규칙 추가</div>
+            <button onclick="closeAddRuleModal()" class="btn-icon">×</button>
+        </div>
+        <div style="padding:16px 20px">
+            <div class="modal-field">
+                <label>규칙 이름 *</label>
+                <input type="text" id="addName" placeholder="예: Allow HTTP"/>
+            </div>
+            <div class="modal-field">
+                <label>동작 *</label>
+                <select id="addAction">
+                    <option value="allow">허용 (Allow)</option>
+                    <option value="block">차단 (Block)</option>
+                    <option value="log">로그 (Log)</option>
+                </select>
+            </div>
+            <div class="modal-field">
+                <label>소스 주소 *</label>
+                <input type="text" id="addSrc" placeholder="예: 0.0.0.0/0 또는 192.168.1.0/24"/>
+            </div>
+            <div class="modal-field">
+                <label>목적지 주소 *</label>
+                <input type="text" id="addDst" placeholder="예: any 또는 10.0.0.1"/>
+            </div>
+            <div class="modal-field">
+                <label>포트 *</label>
+                <input type="text" id="addPort" placeholder="예: 80, 443, 8080-8090, any"/>
+            </div>
+            <div class="modal-field">
+                <label>우선순위</label>
+                <input type="number" id="addPriority" placeholder="예: 100" min="1"/>
+            </div>
+            <div class="modal-field">
+                <label>설명</label>
+                <input type="text" id="addDescription" placeholder="규칙에 대한 설명 (선택)"/>
+            </div>
+            <div class="detail-actions">
+                <button class="btn-accent" onclick="submitAddRule()">추가</button>
+                <button class="btn-sm dim" onclick="closeAddRuleModal()">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 규칙 수정 모달 -->
+<div id="editRuleModal" class="modal-overlay" style="display:none">
+    <div class="card modal-box">
+        <div class="card-header">
+            <div class="card-title">규칙 수정</div>
+            <button onclick="closeEditRuleModal()" class="btn-icon">×</button>
+        </div>
+        <div style="padding:16px 20px">
+            <input type="hidden" id="editId"/>
+            <div class="modal-field">
+                <label>규칙 이름 *</label>
+                <input type="text" id="editName"/>
+            </div>
+            <div class="modal-field">
+                <label>동작 *</label>
+                <select id="editAction">
+                    <option value="allow">허용 (Allow)</option>
+                    <option value="block">차단 (Block)</option>
+                    <option value="log">로그 (Log)</option>
+                </select>
+            </div>
+            <div class="modal-field">
+                <label>소스 주소 *</label>
+                <input type="text" id="editSrc"/>
+            </div>
+            <div class="modal-field">
+                <label>목적지 주소 *</label>
+                <input type="text" id="editDst"/>
+            </div>
+            <div class="modal-field">
+                <label>포트 *</label>
+                <input type="text" id="editPort"/>
+            </div>
+            <div class="modal-field">
+                <label>우선순위</label>
+                <input type="number" id="editPriority" min="1"/>
+            </div>
+            <div class="modal-field">
+                <label>설명</label>
+                <input type="text" id="editDescription"/>
+            </div>
+            <div class="detail-actions">
+                <button class="btn-accent" onclick="submitEditRule()">저장</button>
+                <button class="btn-sm dim" onclick="closeEditRuleModal()">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleRule(btn) {
     const id = btn.dataset.id;
@@ -99,9 +210,98 @@ function toggleRule(btn) {
         .catch(() => showToast('규칙 변경 중 오류가 발생했습니다', 'error'));
 }
 
+/* ── 추가 모달 ── */
 function openAddRuleModal() {
-    showToast('규칙 추가 기능은 준비 중입니다', 'info');
+    ['addName','addSrc','addDst','addPort','addDescription'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('addPriority').value = '';
+    document.getElementById('addAction').value = 'allow';
+    document.getElementById('addRuleModal').style.display = 'flex';
 }
+function closeAddRuleModal() { document.getElementById('addRuleModal').style.display = 'none'; }
+
+function submitAddRule() {
+    const body = {
+        name:               document.getElementById('addName').value.trim(),
+        action:             document.getElementById('addAction').value,
+        sourceAddress:      document.getElementById('addSrc').value.trim(),
+        destinationAddress: document.getElementById('addDst').value.trim(),
+        port:               document.getElementById('addPort').value.trim(),
+        priority:           document.getElementById('addPriority').value || '100',
+        description:        document.getElementById('addDescription').value.trim()
+    };
+    fetch('/api/firewall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) { closeAddRuleModal(); location.reload(); }
+    })
+    .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+/* ── 수정 모달 ── */
+function openEditModal(row) {
+    const d = row.dataset;
+    document.getElementById('editId').value          = d.dbid;
+    document.getElementById('editName').value        = d.name;
+    document.getElementById('editAction').value      = d.action;
+    document.getElementById('editSrc').value         = d.src;
+    document.getElementById('editDst').value         = d.dst;
+    document.getElementById('editPort').value        = d.port;
+    document.getElementById('editPriority').value    = d.priority;
+    document.getElementById('editDescription').value = d.description || '';
+    document.getElementById('editRuleModal').style.display = 'flex';
+}
+function closeEditRuleModal() { document.getElementById('editRuleModal').style.display = 'none'; }
+
+function submitEditRule() {
+    const id = document.getElementById('editId').value;
+    const body = {
+        name:               document.getElementById('editName').value.trim(),
+        action:             document.getElementById('editAction').value,
+        sourceAddress:      document.getElementById('editSrc').value.trim(),
+        destinationAddress: document.getElementById('editDst').value.trim(),
+        port:               document.getElementById('editPort').value.trim(),
+        priority:           document.getElementById('editPriority').value,
+        description:        document.getElementById('editDescription').value.trim()
+    };
+    fetch('/api/firewall/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) { closeEditRuleModal(); location.reload(); }
+    })
+    .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+/* ── 삭제 ── */
+function deleteRule(btn) {
+    const id   = btn.dataset.id;
+    const name = btn.dataset.name;
+    if (!confirm("'" + name + "' 규칙을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.")) return;
+    fetch('/api/firewall/' + id, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) location.reload();
+        })
+        .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+/* ESC 닫기 */
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closeAddRuleModal();
+        closeEditRuleModal();
+    }
+});
 </script>
 
 </content>

@@ -14,20 +14,28 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * UDP 514 포트로 수신된 Syslog(Suricata EVE JSON) 메시지를 처리한다.
+ * UDP syslog 포트로 수신된 Suricata EVE JSON 메시지를 처리한다.
  *
  * Suricata alert.severity 매핑:
  *   1 → HIGH  (riskScore 90)
  *   2 → MEDIUM (riskScore 60)
  *   3 → LOW   (riskScore 30)
  *   그 외 → INFO (riskScore 10)
+ *
+ * stats / flow / stats 등 보안과 무관한 이벤트는 저장하지 않는다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class SyslogEventHandler {
 
-    private static final Pattern JSON_PATTERN = Pattern.compile("(\\{.*})");
+    /** syslog 헤더 뒤의 JSON 블록 추출. DOTALL 로 멀티라인 페이로드도 대응. */
+    private static final Pattern JSON_PATTERN = Pattern.compile("(\\{.*})", Pattern.DOTALL);
+
+    /** 보안과 무관한 Suricata event_type — 저장 생략 */
+    private static final java.util.Set<String> SKIP_EVENT_TYPES = java.util.Set.of(
+            "stats", "flow", "netflow", "fileinfo", "packetinfo"
+    );
 
     private final SecurityEventService securityEventService;
     private final ObjectMapper objectMapper;
@@ -45,6 +53,14 @@ public class SyslogEventHandler {
 
         try {
             JsonNode root = objectMapper.readTree(json);
+
+            // 보안과 무관한 이벤트 타입은 저장하지 않음
+            String eventType = root.path("event_type").asText("").toLowerCase();
+            if (SKIP_EVENT_TYPES.contains(eventType)) {
+                log.debug("[Syslog] 비보안 이벤트 타입 스킵: {}", eventType);
+                return;
+            }
+
             SecurityEvent event = mapToSecurityEvent(root, json);
             securityEventService.createEvent(event);
             log.info("[Syslog] SecurityEvent 저장 완료 - type={}, src={}", event.getEventType(), event.getSourceIp());

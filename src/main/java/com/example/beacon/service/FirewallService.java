@@ -1,5 +1,6 @@
 package com.example.beacon.service;
 
+import com.example.beacon.dto.FirewallRuleRequest;
 import com.example.beacon.entity.FirewallRule;
 import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.FirewallRuleRepository;
@@ -41,5 +42,54 @@ public class FirewallService {
                 .orElseThrow(() -> new ResourceNotFoundException("FirewallRule", id));
         rule.setEnabled(!rule.getEnabled());
         return firewallRuleRepository.save(rule);
+    }
+
+    @Transactional
+    public FirewallRule createRule(FirewallRuleRequest req) {
+        int priority = parsePriority(req.getPriority(), 100);
+        FirewallRule rule = FirewallRule.builder()
+                .name(req.getName())
+                .action(req.getAction() != null ? req.getAction() : "block")
+                .sourceAddress(req.getSourceAddress())
+                .destinationAddress(req.getDestinationAddress())
+                .port(req.getPort())
+                .priority(priority)
+                .enabled(true)
+                .hits(0L)
+                .description(req.getDescription())
+                .build();
+        return firewallRuleRepository.save(rule);
+    }
+
+    @Transactional
+    public FirewallRule updateRule(Long id, FirewallRuleRequest req) {
+        FirewallRule rule = firewallRuleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("FirewallRule", id));
+        rule.setName(req.getName());
+        rule.setAction(req.getAction() != null ? req.getAction() : "block");
+        rule.setSourceAddress(req.getSourceAddress());
+        rule.setDestinationAddress(req.getDestinationAddress());
+        rule.setPort(req.getPort());
+        rule.setPriority(parsePriority(req.getPriority(), rule.getPriority()));
+        if (req.getDescription() != null) {
+            rule.setDescription(req.getDescription());
+        }
+        return firewallRuleRepository.save(rule);
+    }
+
+    @Transactional
+    public void deleteRule(Long id) {
+        FirewallRule rule = firewallRuleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("FirewallRule", id));
+        firewallRuleRepository.delete(rule);
+    }
+
+    private static int parsePriority(String value, int defaultValue) {
+        if (value == null || value.isBlank()) return defaultValue;
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 }

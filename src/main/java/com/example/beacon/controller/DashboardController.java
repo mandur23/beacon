@@ -327,6 +327,7 @@ public class DashboardController {
         m.put("port", r.getPort());
         m.put("hits", r.getHits());
         m.put("enabled", r.getEnabled());
+        m.put("description", r.getDescription() != null ? r.getDescription() : "");
         return m;
     }
 

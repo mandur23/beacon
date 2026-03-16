@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>페이지를 찾을 수 없음 · Beacon</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}"/>
+    <style>
+        .error-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: var(--bg);
+            text-align: center;
+        }
+        .error-page .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 48px;
+        }
+        .error-page .logo-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            background: linear-gradient(135deg, var(--red), var(--orange));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .error-page .logo-title { font-size: 16px; font-weight: 800; color: #fff; letter-spacing: .14em; }
+        .error-page .logo-sub    { font-size: 9px; color: var(--muted); letter-spacing: .2em; display: block; }
+        .error-code {
+            font-size: 120px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--surface2);
+            letter-spacing: -0.04em;
+            text-shadow: 0 0 60px rgba(0,229,255,.15);
+        }
+        .error-code span { color: var(--accent); }
+        .error-title {
+            font-size: 18px;
+            color: #e0eaf8;
+            margin-top: 16px;
+            letter-spacing: .04em;
+        }
+        .error-desc {
+            font-size: 12px;
+            color: var(--dim);
+            margin-top: 8px;
+            max-width: 360px;
+        }
+        .error-path {
+            margin-top: 20px;
+            padding: 10px 16px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 11px;
+            color: var(--dim);
+            word-break: break-all;
+        }
+        .error-actions {
+            margin-top: 32px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+<div class="error-page">
+    <a th:href="@{/dashboard}" class="logo" style="text-decoration:none; color:inherit;">
+        <div class="logo-icon">🛡</div>
+        <div>
+            <span class="logo-title">BEACON</span>
+            <span class="logo-sub">ADMIN CONSOLE</span>
+        </div>
+    </a>
+    <div class="error-code">4<span>0</span>4</div>
+    <h1 class="error-title">페이지를 찾을 수 없습니다</h1>
+    <p class="error-desc">요청하신 주소가 없거나 이동되었을 수 있습니다. 경로를 확인하거나 대시보드로 돌아가 주세요.</p>
+    <div class="error-path" th:if="${path}" th:text="${path}">/some/missing/path</div>
+    <div class="error-actions">
+        <a th:href="@{/dashboard}" class="btn-accent">대시보드로 이동</a>
+        <a href="javascript:history.back()" class="btn-sm dim">이전 페이지</a>
+    </div>
+</div>
+</body>
+</html>

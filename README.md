@@ -1,6 +1,6 @@
 # 🛡️ Beacon - 통합 보안 모니터링 시스템
 
-웹 사용자의 행동 로그와 네트워크 트래픽 데이터를 수집·분석하는 AI 기반 보안 모니터링 시스템
+Raspberry Pi 허브 기반으로 경유 트래픽을 캡처하고, 클라이언트 에이전트와 결합하여 네트워크 및 시스템 위협을 실시간 탐지하는 AI 보안 모니터링 시스템
 
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.3-green)
@@ -22,13 +22,17 @@
 
 ## 🎯 프로젝트 개요
 
-Beacon은 **Spring Boot**와 **Python ML**을 결합한 **엔터프라이즈급 보안 모니터링 솔루션**입니다.
+Beacon은 **Raspberry Pi 허브** 기반의 **Spring Boot**, **Suricata IDS**, **Python ML**을 결합한 **통합 네트워크 보안 모니터링 솔루션**입니다.
+
+라즈베리파이가 네트워크 허브 중간 역할을 하며 경유하는 모든 트래픽을 캡처하고, 클라이언트 에이전트가 설치된 모니터링 대상 PC에서 추가 데이터를 수집하여 MySQL에 저장합니다.
 
 ### 핵심 가치
 
-- 🔍 **실시간 위협 감지**: 네트워크 트래픽과 사용자 행동을 실시간으로 모니터링
+- 🍓 **허브 기반 수동적 캡처**: Raspberry Pi가 허브 역할을 하며 Suricata + libpcap으로 경유 트래픽 전체를 투명하게 캡처
+- 📡 **능동적 에이전트 수집**: 클라이언트 PC에 설치된 BeaconGuardian 에이전트가 USB, 프로세스, 파일, 로컬 패킷 데이터를 Pi로 직접 전송
+- 🔍 **실시간 침입 탐지**: Suricata IDS/IPS 규칙으로 네트워크 위협 실시간 탐지
 - 🤖 **AI 기반 분석**: 머신러닝을 활용한 지능형 이상 탐지
-- 📊 **통합 대시보드**: 직관적인 웹 UI로 보안 상태를 한눈에 파악
+- 📊 **통합 대시보드**: 같은 네트워크 내 PC에서 `http://[Pi IP]:8080`으로 접속하는 직관적인 웹 UI
 - 🔐 **엔터프라이즈 보안**: JWT 인증, 암호화, 접근 제어 등 강력한 보안 기능
 
 ### 주요 기능
@@ -47,7 +51,14 @@ Beacon은 **Spring Boot**와 **Python ML**을 결합한 **엔터프라이즈급 
 
 ## 🛠️ 기술 스택
 
-### Backend (Spring Boot)
+### 🍓 Raspberry Pi Hub (중앙 허브)
+| 기술 | 버전 | 용도 |
+|------|------|------|
+| Raspberry Pi OS | Bookworm (64-bit) | 허브 운영체제 |
+| Suricata | 7.x | 네트워크 IDS/IPS - 허브 경유 트래픽 캡처 및 침입 탐지 |
+| libpcap | Latest | Suricata 패킷 캡처 라이브러리 (Linux) |
+
+### Backend (Spring Boot - Raspberry Pi 실행)
 | 기술 | 버전 | 용도 |
 |------|------|------|
 | Java | 21 | 메인 프로그래밍 언어 |
@@ -68,7 +79,7 @@ Beacon은 **Spring Boot**와 **Python ML**을 결합한 **엔터프라이즈급 
 | HTML5/CSS3 | 마크업 및 스타일링 |
 | JavaScript (ES6+) | 클라이언트 사이드 로직 |
 
-### ML Service (Python)
+### ML Service (Python - Raspberry Pi 실행)
 | 기술 | 버전 | 용도 |
 |------|------|------|
 | Python | 3.10+ | ML 서비스 언어 |
@@ -78,11 +89,17 @@ Beacon은 **Spring Boot**와 **Python ML**을 결합한 **엔터프라이즈급 
 | scikit-learn | 1.3.0 | 머신러닝 알고리즘 |
 | pandas | 2.1.0 | 데이터 처리 |
 
-### Database
+### Database (Raspberry Pi 실행)
 | 기술 | 버전 | 용도 |
 |------|------|------|
-| MySQL | 8.0 | 메인 데이터베이스 |
+| MySQL | 8.0 | 메인 데이터베이스 (Pi에 직접 설치) |
 | Redis | Latest (선택) | 세션 캐시 |
+
+### 📡 클라이언트 에이전트 (모니터링 대상 PC)
+| 기술 | 버전 | 용도 |
+|------|------|------|
+| Npcap | Latest | Windows 클라이언트 패킷 캡처 라이브러리 |
+| WinDivert (선택) | Latest | 패킷 인터셉트 (Windows) |
 
 ### DevOps & Tools
 | 기술 | 용도 |
@@ -97,83 +114,122 @@ Beacon은 **Spring Boot**와 **Python ML**을 결합한 **엔터프라이즈급 
 ### 전체 구조
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  모니터링 대상 시스템 (직원 PC, 서버, 네트워크 장비)              │
-│  ┌───────────────────────────────────────────────────┐      │
-│  │  📡 데이터 수집 에이전트 (선택사항)                 │        │
-│  │  • USB 장치 모니터링                              │        │
-│  │  • 네트워크 패킷 캡처 (Scapy, Wireshark)          │        │
-│  │  • 프로세스 및 파일 시스템 감시                    │         │
-│  │  • 시스템 이벤트 로그 수집                         │        │
-│  └───────────────────┬───────────────────────────────┘      │
-└──────────────────────┼──────────────────────────────────────┘
-                       │ HTTPS/REST API
-                       ↓
-┌──────────────────────────────────────────────────────────────┐
-│  🖥️ Beacon 중앙 서버                                          │
-│  ┌────────────────────────────────────────────────────┐      │
-│  │  Spring Boot Application (Port 8080)               │      │
-│  │  ┌──────────────────────────────────────────────┐  │      │
-│  │  │  🔐 Security Layer                           │  │      │
-│  │  │  • JWT 인증/인가                              │  │      │
-│  │  │  • BCrypt 암호화                              │  │      │
-│  │  └──────────────────────────────────────────────┘  │      │
-│  │  ┌──────────────────────────────────────────────┐  │      │
-│  │  │  📝 Request Interceptor                      │  │      │
-│  │  │  • 모든 HTTP 요청 로깅                        │  │      │
-│  │  │  • IP, User-Agent, 세션 정보 수집             │  │      │
-│  │  └──────────────────────────────────────────────┘  │      │
-│  │  ┌──────────────────────────────────────────────┐  │      │
-│  │  │  🎮 REST API Controllers                     │  │      │
-│  │  │  • /api/auth - 인증                          │  │      │
-│  │  │  • /api/security-events - 보안 이벤트        │  │      │
-│  │  │  • /api/traffic - 트래픽 분석                │  │      │
-│  │  │  • /api/ml - ML 분석 요청                    │  │      │
-│  │  └──────────────────────────────────────────────┘  │      │
-│  │  ┌──────────────────────────────────────────────┐  │      │
-│  │  │  💼 Service Layer                            │  │      │
-│  │  │  • SecurityEventService                      │  │      │
-│  │  │  • TrafficAnalysisService                    │  │      │
-│  │  │  • UserSessionService                        │  │      │
-│  │  └──────────────────────────────────────────────┘  │      │
-│  │  ┌──────────────────────────────────────────────┐  │      │
-│  │  │  🗄️ JPA Repositories                         │  │      │
-│  │  │  • MySQL 데이터 접근 계층                     │  │      │
-│  │  └──────────────────────────────────────────────┘  │      │
-│  └────────────────┬─────────────────┬─────────────────┘      │
-│                   │                 │                         │
-│  ┌────────────────▼─────┐  ┌────────▼──────────────────┐     │
-│  │  💾 MySQL Database   │  │  🧠 Python ML Service     │     │
-│  │  (Port 3306)         │  │  (Port 5000)              │     │
-│  │  • users             │  │  Flask REST API           │     │
-│  │  • user_sessions     │  │  • 이상 탐지 알고리즘     │     │
-│  │  • security_events   │  │  • 위협 패턴 분석         │     │
-│  │  • traffic_logs      │  │  • 예측 모델              │     │
-│  │  • firewall_rules    │  │  • 배치 처리              │     │
-│  └──────────────────────┘  └───────────────────────────┘     │
-└──────────────────────┬───────────────────────────────────────┘
-                       │ HTTP/HTTPS
-                       ↓
-              ┌────────────────┐
-              │  🌐 관리자 웹   │
-              │  브라우저        │
-              │  • 대시보드      │
-              │  • 이벤트 로그   │
-              │  • 통계 및 보고서│
-              └────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  💻 모니터링 대상 시스템 (직원 PC, 서버 등)                        │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────┐     │
+│  │  📡 BeaconGuardian 클라이언트 에이전트 (필수 설치)      │     │
+│  │  • USB 장치 연결/제거 감지 및 로그 기록                 │     │
+│  │  • 프로세스 실행 및 리소스 사용 모니터링                │     │
+│  │  • 파일 시스템 변경 감지 (무결성 검사)                  │     │
+│  │  • 시스템 이벤트 로그 수집                              │     │
+│  │  • Npcap 기반 로컬 패킷 캡처 (Windows)                 │     │
+│  │  • Heartbeat로 연결 상태 유지                           │     │
+│  └───────────────────────┬───────────────────────────────┘     │
+└──────────────────────────┼──────────────────────────────────────┘
+                           │ HTTPS/REST API (에이전트 데이터 전송)
+                           │ 네트워크 허브 경유
+                           ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  🍓 Raspberry Pi Hub (중앙 허브 - 모든 컴포넌트 단일 실행)         │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────┐     │
+│  │  🔍 Suricata + libpcap (네트워크 IDS/IPS)              │     │
+│  │  • 허브를 경유하는 모든 네트워크 트래픽 실시간 캡처     │     │
+│  │  • 침입 탐지(IDS) / 침입 방지(IPS) 규칙 기반 분석      │     │
+│  │  • EVE JSON 형식으로 이벤트 로그 생성                  │     │
+│  │  • Syslog를 통해 Spring Boot로 이벤트 전달             │     │
+│  └───────────────────────┬───────────────────────────────┘     │
+│                          │ EVE JSON / Syslog (UDP 514)         │
+│                          ↓                                     │
+│  ┌───────────────────────────────────────────────────────┐     │
+│  │  🖥️ Spring Boot Application (Port 8080)               │     │
+│  │  ┌─────────────────────────────────────────────────┐  │     │
+│  │  │  🔐 Security Layer                              │  │     │
+│  │  │  • JWT 인증/인가 · BCrypt 암호화                 │  │     │
+│  │  └─────────────────────────────────────────────────┘  │     │
+│  │  ┌─────────────────────────────────────────────────┐  │     │
+│  │  │  📝 Syslog Event Handler                        │  │     │
+│  │  │  • Suricata EVE JSON 파싱                        │  │     │
+│  │  │  • 보안 이벤트 자동 생성 및 분류                 │  │     │
+│  │  └─────────────────────────────────────────────────┘  │     │
+│  │  ┌─────────────────────────────────────────────────┐  │     │
+│  │  │  🎮 REST API Controllers                        │  │     │
+│  │  │  • /api/auth          - 인증                    │  │     │
+│  │  │  • /api/security-events - 보안 이벤트           │  │     │
+│  │  │  • /api/traffic       - 트래픽 분석             │  │     │
+│  │  │  • /api/ml            - ML 분석 요청            │  │     │
+│  │  │  • /api/agent         - 클라이언트 에이전트 수신 │  │     │
+│  │  └─────────────────────────────────────────────────┘  │     │
+│  │  ┌─────────────────────────────────────────────────┐  │     │
+│  │  │  💼 Service Layer                               │  │     │
+│  │  │  • SecurityEventService · TrafficAnalysisService│  │     │
+│  │  │  • UserSessionService  · LoggingService         │  │     │
+│  │  └─────────────────────────────────────────────────┘  │     │
+│  └─────────────────────┬──────────────────┬───────────────┘     │
+│                        │                  │                     │
+│  ┌─────────────────────▼──┐  ┌────────────▼──────────────┐     │
+│  │  💾 MySQL (Port 3306)  │  │  🧠 Python ML (Port 5000)  │     │
+│  │  Pi에 직접 설치         │  │  Pi에서 실행 (Flask)        │     │
+│  │  • users               │  │  • 이상 탐지 알고리즘       │     │
+│  │  • user_sessions       │  │  • 위협 패턴 분석           │     │
+│  │  • security_events     │  │  • 예측 모델 · 배치 처리    │     │
+│  │  • traffic_logs        │  └───────────────────────────┘     │
+│  │  • firewall_rules      │                                     │
+│  └────────────────────────┘                                     │
+└──────────────────────────────────────────────────────────────────┘
+                           │ HTTP (http://[Pi IP]:8080)
+                           ↓
+              ┌─────────────────────────┐
+              │  🌐 관리자 PC 웹 브라우저  │
+              │  (같은 네트워크 내 접속)   │
+              │  • 대시보드               │
+              │  • 이벤트 로그            │
+              │  • 트래픽 분석            │
+              │  • 통계 및 보고서         │
+              └─────────────────────────┘
 ```
 
 ### 데이터 흐름
 
 ```
-1️⃣ 데이터 수집
-   [사용자/시스템] → [Spring Boot 인터셉터] → [MySQL 저장]
+1️⃣ 네트워크 트래픽 캡처 (허브 레벨)
+   [클라이언트 ↔ 인터넷 트래픽]
+     → [Suricata + libpcap이 허브 경유 패킷 캡처]
+     → [EVE JSON 이벤트 생성]
+     → [Syslog → Spring Boot SyslogEventHandler]
+     → [MySQL traffic_logs / security_events 저장]
 
-2️⃣ AI 분석 요청
-   [Spring Boot] → [Python ML Service] → [이상 탐지 결과]
+2️⃣ 클라이언트 에이전트 데이터 전송 (능동 수집)
+   [BeaconGuardian 에이전트 (USB·프로세스·파일·로컬패킷)]
+     → [HTTPS REST API → Spring Boot /api/agent]
+     → [MySQL 저장]
 
-3️⃣ 결과 저장 및 조회
-   [Python 결과] → [Spring Boot] → [MySQL 업데이트] → [웹 대시보드 표시]
+3️⃣ AI 이상 탐지
+   [Spring Boot] → [Python ML Service (Port 5000)]
+     → [이상 탐지 결과] → [MySQL 업데이트]
+
+4️⃣ 관리자 대시보드 조회
+   [관리자 PC 브라우저] → [http://[Pi IP]:8080]
+     → [Spring Boot Thymeleaf 렌더링] → [실시간 보안 현황 표시]
+```
+
+### 네트워크 토폴로지
+
+```
+[인터넷/외부망]
+       │
+       │ (업링크)
+┌──────▼──────────────────────────────────┐
+│  🍓 Raspberry Pi (허브/스위치 역할)       │
+│  eth0: 업링크  eth1: 내부망 스위치 포트   │
+│  Suricata → 내부망 트래픽 전체 캡처      │
+└──────┬───────────────────────────────────┘
+       │ (내부 네트워크 192.168.x.x)
+  ┌────┴────┬──────────────────┐
+  │         │                  │
+[PC-1]    [PC-2]           [서버-1]
+BeaconGuardian 에이전트 설치됨
 ```
 
 
@@ -181,47 +237,121 @@ Beacon은 **Spring Boot**와 **Python ML**을 결합한 **엔터프라이즈급 
 
 ### 사전 요구사항
 
-```bash
+```
+[🍓 Raspberry Pi Hub]
+✅ Raspberry Pi 4 이상 (RAM 4GB 권장)
+✅ Raspberry Pi OS Bookworm 64-bit
 ✅ JDK 21 이상
 ✅ MySQL 8.0 이상
 ✅ Python 3.10 이상
+✅ Suricata 7.x
+✅ 네트워크 인터페이스 2개 이상 (업링크 + 내부망)
 ⭕ Redis (선택사항, 세션 캐시용)
+
+[💻 클라이언트 에이전트 (Windows PC)]
+✅ Npcap 설치 (https://npcap.com)
+✅ BeaconGuardian 에이전트 실행 파일
 ```
 
 ### 빠른 시작 (Quick Start)
 
-#### 1️⃣ 데이터베이스 설정
+---
 
-MySQL에 접속하여 데이터베이스를 생성합니다:
+#### 🍓 [Raspberry Pi] 1️⃣ Suricata + libpcap 설치
 
 ```bash
-mysql -u root -p
+# 패키지 업데이트
+sudo apt update && sudo apt upgrade -y
+
+# Suricata 설치 (libpcap 포함)
+sudo apt install -y suricata
+
+# Suricata 버전 확인
+suricata --build-info | grep libpcap
+
+# 내부망 인터페이스 확인 (예: eth1)
+ip link show
+```
+
+Suricata 설정 파일에서 내부망 인터페이스 및 EVE JSON 출력 활성화:
+
+```bash
+sudo nano /etc/suricata/suricata.yaml
+```
+
+```yaml
+# 모니터링할 네트워크 인터페이스 설정
+af-packet:
+  - interface: eth1        # 내부망 인터페이스
+
+# EVE JSON 로그 출력 (Spring Boot가 읽어들임)
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: syslog
+      prefix: "@cee: "
+      types:
+        - alert
+        - http
+        - dns
+        - tls
+        - flow
+
+# Syslog 전송 설정 (Spring Boot 수신 포트)
+syslog:
+  enabled: yes
+  facility: local5
+  level: Info
+```
+
+```bash
+# Suricata 서비스 시작 및 자동 시작 등록
+sudo systemctl enable suricata
+sudo systemctl start suricata
+sudo systemctl status suricata
+```
+
+---
+
+#### 🍓 [Raspberry Pi] 2️⃣ MySQL 설치 및 데이터베이스 설정
+
+```bash
+# MySQL 설치
+sudo apt install -y mysql-server
+
+# MySQL 보안 설정
+sudo mysql_secure_installation
+
+# MySQL 접속
+sudo mysql -u root -p
 ```
 
 ```sql
 CREATE DATABASE beacon CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'beacon'@'localhost' IDENTIFIED BY 'your_strong_password';
+GRANT ALL PRIVILEGES ON beacon.* TO 'beacon'@'localhost';
+FLUSH PRIVILEGES;
 EXIT;
 ```
 
-#### 2️⃣ 프로젝트 클론 및 설정
+---
+
+#### 🍓 [Raspberry Pi] 3️⃣ 프로젝트 클론 및 Spring Boot 설정
 
 ```bash
 # 프로젝트 클론
 git clone https://github.com/your-repo/beacon.git
 cd beacon
-
-# application.yaml 설정 수정
-# src/main/resources/application.yaml
 ```
 
-`src/main/resources/application.yaml` 파일에서 데이터베이스 연결 정보를 수정합니다:
+`src/main/resources/application.yaml` 파일에서 연결 정보를 수정합니다:
 
 ```yaml
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/beacon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: your_password  # 👈 여기를 수정하세요
+    username: beacon
+    password: your_strong_password  # 👈 위에서 설정한 비밀번호
 
 jwt:
   secret: your-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-beacon-security
@@ -230,73 +360,69 @@ jwt:
 ml:
   python:
     service:
-      url: http://localhost:5000  # Python ML 서비스 URL
+      url: http://localhost:5000  # Pi 로컬 ML 서비스
+
+# Suricata Syslog 수신 포트
+syslog:
+  port: 514
 ```
 
-#### 3️⃣ Spring Boot 애플리케이션 실행
-
-**Windows (PowerShell):**
-```powershell
-# 빌드
-.\gradlew.bat clean build
-
-# 실행
-.\gradlew.bat bootRun
-```
-
-**Linux/Mac:**
 ```bash
-# 빌드
-./gradlew clean build
+# JDK 21 설치
+sudo apt install -y openjdk-21-jdk
 
-# 실행
+# Spring Boot 빌드 및 실행
+./gradlew clean build
 ./gradlew bootRun
 ```
 
-서버는 기본적으로 `http://localhost:8080`에서 실행됩니다.
+서버는 `http://[Pi IP]:8080`에서 실행됩니다. Pi의 IP 확인:
 
-#### 4️⃣ Python ML 서비스 실행
-
-**새 터미널 창을 열고:**
-
-**Windows:**
-```powershell
-cd python-ml
-
-# 가상환경 생성
-python -m venv venv
-.\venv\Scripts\activate
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 서비스 실행
-python app.py
+```bash
+hostname -I
 ```
 
-**Linux/Mac:**
+---
+
+#### 🍓 [Raspberry Pi] 4️⃣ Python ML 서비스 실행
+
 ```bash
 cd python-ml
 
-# 가상환경 생성
+# 가상환경 생성 및 활성화
 python3 -m venv venv
 source venv/bin/activate
 
 # 의존성 설치
 pip install -r requirements.txt
 
-# 서비스 실행
-python app.py
+# 서비스 실행 (백그라운드)
+nohup python app.py &
 ```
 
-ML 서비스는 기본적으로 `http://localhost:5000`에서 실행됩니다.
+---
 
-#### 5️⃣ 웹 브라우저에서 접속
+#### 💻 [클라이언트 PC] 5️⃣ BeaconGuardian 에이전트 설치 (Windows)
 
-브라우저를 열고 다음 주소로 접속:
+```powershell
+# 1. Npcap 설치 (https://npcap.com 에서 다운로드)
+#    설치 시 "WinPcap API-compatible Mode" 체크 권장
+
+# 2. BeaconGuardian 에이전트 설정
+#    config.yaml에서 Pi 서버 주소 설정
+beacon_server: http://192.168.x.x:8080   # Pi IP로 변경
+agent_id: PC-001
+heartbeat_interval: 30  # 초
+```
+
+---
+
+#### 🌐 [관리자 PC] 6️⃣ 웹 대시보드 접속
+
+같은 네트워크의 PC 브라우저에서 Pi IP로 접속:
 
 ```
-http://localhost:8080
+http://192.168.x.x:8080
 ```
 
 **기본 로그인 정보:**
@@ -305,16 +431,24 @@ http://localhost:8080
 
 ⚠️ **보안 주의사항**: 로그인 후 새로운 관리자 계정을 생성하고 기본 계정은 삭제하는 것을 권장합니다.
 
+---
+
 ### 실행 확인
 
-#### Spring Boot 서버 확인
+#### Spring Boot 서버 확인 (Pi에서)
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
-#### Python ML 서비스 확인
+#### Python ML 서비스 확인 (Pi에서)
 ```bash
 curl http://localhost:5000/health
+```
+
+#### Suricata 동작 확인 (Pi에서)
+```bash
+sudo tail -f /var/log/suricata/eve.json
+sudo systemctl status suricata
 ```
 
 #### 데이터베이스 마이그레이션 확인
@@ -991,11 +1125,14 @@ Strict-Transport-Security: max-age=31536000
 - [ ] 기본 관리자 계정 삭제 또는 비밀번호 변경
 - [ ] JWT 비밀키 변경 및 안전하게 보관
 - [ ] MySQL 비밀번호 강화
-- [ ] HTTPS 적용
-- [ ] 방화벽 규칙 설정
+- [ ] HTTPS 적용 (Pi에 Let's Encrypt SSL 인증서 적용)
+- [ ] 방화벽 규칙 설정 (`ufw allow 8080/tcp`, `ufw allow 514/udp`)
+- [ ] Raspberry Pi SSH 기본 비밀번호 변경
+- [ ] Suricata 규칙(Rules) 정기 업데이트 (`suricata-update`)
 - [ ] 로그 모니터링 설정
-- [ ] 백업 정책 수립
-- [ ] 침입 탐지 시스템 (IDS) 구성
+- [ ] 백업 정책 수립 (MySQL dump, Suricata logs)
+- [ ] Pi 물리적 보안 (허브 역할이므로 물리 접근 통제 필요)
+- [ ] 침입 탐지 시스템 (IDS) 구성 - Suricata 완료
 
 
 ## 🚧 향후 개선 사항
@@ -1008,10 +1145,15 @@ Strict-Transport-Security: max-age=31536000
   - 무단 USB 사용 차단
   - 파일 전송 로그 기록
 
-- [x] **네트워크 패킷 캡처 에이전트**
-  - Scapy 기반 패킷 수집
-  - 실시간 네트워크 트래픽 분석
-  - 프로토콜별 통계
+- [x] **네트워크 패킷 캡처**
+  - Pi Hub: Suricata + libpcap으로 허브 경유 전체 트래픽 캡처 (완료)
+  - 클라이언트: Npcap 기반 로컬 패킷 수집 (Windows)
+  - 실시간 네트워크 트래픽 분석 및 프로토콜별 통계
+
+- [x] **Suricata IDS/IPS 통합**
+  - Raspberry Pi Hub에서 Suricata + libpcap 실행 (완료)
+  - EVE JSON → Syslog → Spring Boot SyslogEventHandler 파이프라인
+  - 네트워크 침입 탐지 규칙(Suricata Rules) 자동 적용
 
 - [x] **프로세스 모니터링**
   - 실행 중인 프로세스 추적
@@ -1155,7 +1297,7 @@ Strict-Transport-Security: max-age=31536000
 
 ### 오픈소스 통합
 - [ ] **Wazuh**: 호스트 기반 침입 탐지
-- [ ] **Suricata**: 네트워크 IDS/IPS
+- [x] **Suricata**: 네트워크 IDS/IPS (Raspberry Pi Hub에 통합 완료)
 - [ ] **Osquery**: 시스템 쿼리
 - [ ] **Elastic Beats**: 다양한 데이터 수집
 
@@ -1177,7 +1319,82 @@ Strict-Transport-Security: max-age=31536000
 
 ## 🐛 문제 해결 (Troubleshooting)
 
-### MySQL 연결 오류
+### 🍓 Raspberry Pi 관련
+
+#### Suricata가 트래픽을 캡처하지 못하는 경우
+```
+Error: [ERRCODE: SC_ERR_AFP_CREATE] Couldn't init AF_PACKET
+```
+
+**해결:**
+```bash
+# 인터페이스 이름 확인
+ip link show
+
+# suricata.yaml에서 인터페이스 이름 수정
+sudo nano /etc/suricata/suricata.yaml
+# af-packet.interface 값을 실제 인터페이스 이름으로 변경
+
+# Suricata 재시작
+sudo systemctl restart suricata
+```
+
+#### Spring Boot가 Syslog를 수신하지 못하는 경우
+```
+Suricata 이벤트가 security_events 테이블에 저장 안 됨
+```
+
+**해결:**
+```bash
+# Suricata 로그 확인
+sudo tail -f /var/log/suricata/eve.json
+
+# Syslog 포트 514 리스닝 여부 확인
+sudo netstat -ulnp | grep 514
+
+# 방화벽에서 514 포트 허용
+sudo ufw allow 514/udp
+```
+
+#### Raspberry Pi 메모리 부족
+```
+Spring Boot OOM (Out of Memory)
+```
+
+**해결:**
+```bash
+# JVM 힙 메모리 제한 설정 (Pi 4GB RAM 기준)
+export JAVA_OPTS="-Xmx512m -Xms256m"
+./gradlew bootRun
+
+# 또는 application.yaml에서 스와프 설정
+sudo dphys-swapfile swapoff
+sudo nano /etc/dphys-swapfile  # CONF_SWAPSIZE=2048
+sudo dphys-swapfile setup
+sudo dphys-swapfile swapon
+```
+
+#### 외부 PC에서 Pi 대시보드 접속 불가
+**해결:**
+```bash
+# Pi의 IP 확인
+hostname -I
+
+# 8080 포트 방화벽 허용
+sudo ufw allow 8080/tcp
+
+# Spring Boot가 모든 인터페이스에 바인드되는지 확인
+# application.yaml
+server:
+  address: 0.0.0.0
+  port: 8080
+```
+
+---
+
+### 공통 오류
+
+#### MySQL 연결 오류
 ```
 Error: Access denied for user 'root'@'localhost'
 ```
@@ -1187,11 +1404,11 @@ Error: Access denied for user 'root'@'localhost'
 2. application.yaml의 username/password 확인
 3. MySQL 사용자 권한 확인:
 ```sql
-GRANT ALL PRIVILEGES ON beacon.* TO 'root'@'localhost';
+GRANT ALL PRIVILEGES ON beacon.* TO 'beacon'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-### Python 서비스 연결 실패
+#### Python 서비스 연결 실패
 ```
 Error: Connection refused to localhost:5000
 ```
@@ -1201,7 +1418,7 @@ Error: Connection refused to localhost:5000
 2. 포트 5000이 사용 가능한지 확인
 3. application.yaml의 ML 서비스 URL 확인
 
-### Flyway 마이그레이션 오류
+#### Flyway 마이그레이션 오류
 ```
 Error: Migration checksum mismatch
 ```
@@ -1213,7 +1430,7 @@ DROP TABLE flyway_schema_history;
 -- 애플리케이션 재시작
 ```
 
-### 포트 충돌
+#### 포트 충돌
 ```
 Error: Port 8080 is already in use
 ```
@@ -1229,17 +1446,22 @@ server:
 
 ### API 테스트 예제
 
+> Pi IP를 `192.168.x.x`로 가정합니다. `hostname -I` 명령으로 실제 Pi IP를 확인하세요.
+
 ```bash
-# 로그인
-curl -X POST http://localhost:8080/api/auth/login \
+# 로그인 (관리자 PC에서 Pi로 요청)
+curl -X POST http://192.168.x.x:8080/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin1234"}'
 
 # 보안 이벤트 조회 (JWT 토큰 필요)
-curl -X GET http://localhost:8080/api/security-events \
+curl -X GET http://192.168.x.x:8080/api/security-events \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-# ML 이상 탐지
+# Suricata 이벤트 수동 확인 (Pi 로컬에서)
+sudo cat /var/log/suricata/eve.json | python3 -m json.tool | head -50
+
+# ML 이상 탐지 (Pi 로컬에서)
 curl -X POST http://localhost:5000/api/detect-anomaly \
   -H "Content-Type: application/json" \
   -d '{

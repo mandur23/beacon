@@ -11,5 +11,4 @@ public class BeaconApplication {
     public static void main(String[] args) {
         SpringApplication.run(BeaconApplication.class, args);
     }
-
 }

@@ -108,24 +108,35 @@
 </div>
 
 <script>
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
+
 let currentEventDbId = null;
 
 document.querySelectorAll('.clickable-row').forEach(row => {
     row.addEventListener('click', () => {
         const d = row.dataset;
-        currentEventDbId = d.dbid;
+        currentEventDbId = parseInt(d.dbid, 10);
         document.getElementById('detailPanel').style.display = 'block';
+        const sevcolor = escapeHtml(d.sevcolor);
         document.getElementById('detailTop').innerHTML = `
-            <span class="badge" style="color:${d.sevcolor};background:${d.sevcolor}18;border-color:${d.sevcolor}44">${d.sevlabel}</span>
-            <div style="font-size:14px;color:#fff;font-weight:600;margin-top:8px">${d.type}</div>
-            <div style="font-size:10px;color:var(--dim);margin-top:4px">${d.id} · ${d.time}</div>
+            <span class="badge" style="color:${sevcolor};background:${sevcolor}18;border-color:${sevcolor}44">${escapeHtml(d.sevlabel)}</span>
+            <div style="font-size:14px;color:#fff;font-weight:600;margin-top:8px">${escapeHtml(d.type)}</div>
+            <div style="font-size:10px;color:var(--dim);margin-top:4px">${escapeHtml(d.id)} · ${escapeHtml(d.time)}</div>
         `;
         const rows = [
             ['소스 IP', d.ip], ['프로토콜', d.proto], ['포트', d.port],
             ['발원 위치', d.loc], ['처리 상태', d.status],
         ];
         document.getElementById('detailRows').innerHTML = rows.map(([k,v]) =>
-            `<div class="detail-row"><span class="dim">${k}</span><span class="mono">${v}</span></div>`
+            `<div class="detail-row"><span class="dim">${escapeHtml(k)}</span><span class="mono">${escapeHtml(v)}</span></div>`
         ).join('');
         row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });

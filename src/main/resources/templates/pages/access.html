@@ -156,31 +156,48 @@
 </div>
 
 <script th:inline="none">
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
+
 document.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', e => {
         e.stopPropagation();
         const row = btn.closest('tr');
         const d = row.dataset;
-        const dbId = d.dbid;
+        const dbId = encodeURIComponent(d.dbid);
         document.getElementById('editPanel').style.display = 'block';
         const mfaWarn = d.mfa === 'false'
             ? `<div class="alert alert-warn" style="margin-top:10px">⚠ MFA가 설정되지 않았습니다. 즉시 설정을 권장합니다.</div>` : '';
+        const nameInitial = escapeHtml(d.name ? d.name[0] : '?');
         document.getElementById('editContent').innerHTML = `
             <div style="text-align:center;margin-bottom:16px">
-                <div style="width:52px;height:52px;border-radius:50%;background:#1a2a3a;display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700">${d.name[0]}</div>
+                <div style="width:52px;height:52px;border-radius:50%;background:#1a2a3a;display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700">${nameInitial}</div>
             </div>
-            ${[['이름',d.name],['ID',d.id],['역할',d.role],['이메일',d.email],['마지막 로그인',d.login],['총 로그인',d.count+'회']].map(([k,v])=>
+            ${[['이름',escapeHtml(d.name)],['ID',escapeHtml(d.id)],['역할',escapeHtml(d.role)],['이메일',escapeHtml(d.email)],['마지막 로그인',escapeHtml(d.login)],['총 로그인',escapeHtml(d.count)+'회']].map(([k,v])=>
                 `<div class="detail-row"><span class="dim">${k}</span><span class="mono">${v}</span></div>`
             ).join('')}
             <div class="detail-actions" style="margin-top:12px">
                 ${d.status === 'active'
-                    ? `<button class="btn-danger" onclick="lockUser(${dbId})">계정 잠금</button>`
-                    : `<button class="btn-success" onclick="unlockUser(${dbId})">계정 해제</button>`
+                    ? `<button class="btn-danger" id="lockBtn">계정 잠금</button>`
+                    : `<button class="btn-success" id="unlockBtn">계정 해제</button>`
                 }
-                <button class="btn-accent" onclick="openPermModal(${dbId}, '${d.name}', '${d.role}')">권한 수정</button>
+                <button class="btn-accent" id="permBtn">권한 수정</button>
             </div>
             ${mfaWarn}
         `;
+        const numericId = parseInt(d.dbid, 10);
+        const safeName = d.name || '';
+        const safeRole = d.role || '';
+        document.getElementById('lockBtn')?.addEventListener('click', () => lockUser(numericId));
+        document.getElementById('unlockBtn')?.addEventListener('click', () => unlockUser(numericId));
+        document.getElementById('permBtn')?.addEventListener('click', () => openPermModal(numericId, safeName, safeRole));
         document.getElementById('editPanel').scrollIntoView({behavior:'smooth'});
     });
 });

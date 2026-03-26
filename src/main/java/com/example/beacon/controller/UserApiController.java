@@ -5,16 +5,23 @@ import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class UserApiController {
+
+    private static final Set<String> ALLOWED_ROLES = Set.of(
+            "ROLE_ADMIN", "ROLE_ANALYST", "ROLE_VIEWER", "ROLE_OPERATOR"
+    );
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -50,6 +57,9 @@ public class UserApiController {
         if (newRole == null || newRole.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "역할을 선택해주세요"));
         }
+        if (!ALLOWED_ROLES.contains(newRole)) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "허용되지 않은 역할입니다"));
+        }
         user.setRole(newRole);
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("success", true, "message", "'" + user.getName() + "' 역할이 변경되었습니다"));
@@ -61,6 +71,9 @@ public class UserApiController {
         String name = body.get("name");
         String email = body.get("email");
         String role = body.getOrDefault("role", "ROLE_ANALYST");
+        if (!ALLOWED_ROLES.contains(role)) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "허용되지 않은 역할입니다"));
+        }
         String rawPassword = body.getOrDefault("password", "Changeme123!");
 
         if (username == null || username.isBlank()) {

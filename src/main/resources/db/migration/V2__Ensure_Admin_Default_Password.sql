@@ -1,12 +1,6 @@
--- 기본 관리자 계정의 로그인 정보를 보정한다.
--- username: admin / password: admin1234 (BCrypt)
-
-UPDATE users
-SET password = '$2b$10$aWDSqWCiu9Zr3.oIgU2g6eXZOKw5tCUkinZEqwpIKVebCKcW4W3eS',
-    enabled = TRUE,
-    mfa_enabled = FALSE,
-    role = 'ADMIN'
-WHERE username = 'admin';
+-- admin 계정이 없을 경우에만 초기 계정을 생성한다.
+-- 초기 비밀번호는 반드시 최초 로그인 후 변경해야 합니다.
+-- UPDATE 로 비밀번호를 덮어쓰는 코드는 보안상 제거되었습니다.
 
 INSERT INTO users (username, password, email, name, role, enabled, mfa_enabled)
 SELECT 'admin',

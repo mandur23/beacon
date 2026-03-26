@@ -52,6 +52,12 @@ public class ReportApiController {
     }
 
     private String safe(String s) {
-        return s != null ? s.replace("\"", "\"\"") : "";
+        if (s == null) return "";
+        String escaped = s.replace("\"", "\"\"");
+        // CSV 수식 주입 방어: =, +, -, @ 로 시작하는 값 앞에 탭 문자 삽입
+        if (!escaped.isEmpty() && "=+-@\t\r".indexOf(escaped.charAt(0)) >= 0) {
+            escaped = "\t" + escaped;
+        }
+        return escaped;
     }
 }

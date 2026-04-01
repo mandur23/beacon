@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,34 +26,56 @@ public class AuthController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        User user = userRepository.findByUsername(loginRequest.getUsername()).orElse(null);
+
+        if (user != null) {
+            if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "계정이 잠겨있습니다. 잠시 후 다시 시도해주세요.");
+                return ResponseEntity.status(423).body(error);
+            }
+        }
+
         try {
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
                     loginRequest.getUsername(),
                     loginRequest.getPassword()
                 )
             );
-            
-            User user = userRepository.findByUsername(loginRequest.getUsername())
+
+            user = userRepository.findByUsername(loginRequest.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found"));
-            
+
             user.setLastLoginAt(LocalDateTime.now());
             user.setLoginAttempts(0);
+            user.setLockedUntil(null);
             userRepository.save(user);
-            
+
             String token = tokenProvider.generateToken(user.getUsername(), user.getId());
-            
+
             AuthResponse response = new AuthResponse(
                 token,
                 user.getUsername(),
                 user.getId(),
                 user.getRole()
             );
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            if (user != null) {
+                int attempts = (user.getLoginAttempts() == null ? 0 : user.getLoginAttempts()) + 1;
+                user.setLoginAttempts(attempts);
+                if (attempts >= MAX_LOGIN_ATTEMPTS) {
+                    user.setEnabled(false);
+                    user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+                }
+                userRepository.save(user);
+            }
             Map<String, String> error = new HashMap<>();
             error.put("message", "Invalid username or password");
             return ResponseEntity.status(401).body(error);

@@ -10,7 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -103,6 +105,27 @@ public class SecurityEventService {
         return securityEventRepository.findWithFilters(severity, search);
     }
 
+    /** 지정한 날짜(자정~다음날 자정) 구간의 이벤트만 조회 */
+    @Transactional(readOnly = true)
+    public List<SecurityEvent> getEventsWithFiltersForDate(String severity, String search, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        return securityEventRepository.findWithFiltersAndDateRange(severity, search, start, end);
+    }
+
+    /** 해당 날짜의 severity별 건수 (위협 페이지 필터 카드용) */
+    @Transactional(readOnly = true)
+    public Map<String, Long> getSeverityCountsForDate(LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        List<Object[]> results = securityEventRepository.countBySeverityInDateRange(start, end);
+        Map<String, Long> counts = new HashMap<>();
+        for (Object[] result : results) {
+            counts.put((String) result[0], (Long) result[1]);
+        }
+        return counts;
+    }
+
     @Transactional(readOnly = true)
     public List<Integer> getHourlyData() {
         LocalDateTime since = LocalDateTime.now().toLocalDate().atStartOfDay();
@@ -133,13 +156,18 @@ public class SecurityEventService {
      * 미해결 이벤트의 severity 가중치 합산으로 감점:
      *   critical -10 (최대 -40), high -5 (최대 -20),
      *   medium -2 (최대 -15), low -1 (최대 -5)
+     * 단일 GROUP BY 쿼리로 4번의 개별 쿼리를 대체한다.
      */
     @Transactional(readOnly = true)
     public int calculateSecurityScore() {
-        long critical = securityEventRepository.countUnresolvedBySeverity("critical");
-        long high     = securityEventRepository.countUnresolvedBySeverity("high");
-        long medium   = securityEventRepository.countUnresolvedBySeverity("medium");
-        long low      = securityEventRepository.countUnresolvedBySeverity("low");
+        Map<String, Long> counts = new HashMap<>();
+        for (Object[] row : securityEventRepository.countUnresolvedGroupedBySeverity()) {
+            counts.put(((String) row[0]).toLowerCase(), ((Number) row[1]).longValue());
+        }
+        long critical = counts.getOrDefault("critical", 0L);
+        long high     = counts.getOrDefault("high",     0L);
+        long medium   = counts.getOrDefault("medium",   0L);
+        long low      = counts.getOrDefault("low",      0L);
 
         double penalty = Math.min(critical * 10, 40)
                        + Math.min(high     *  5, 20)
@@ -208,22 +236,41 @@ public class SecurityEventService {
 
     /**
      * 최근 N개월 각 월의 보안 점수 목록 (오래된 달 → 현재 달 순서).
+     * 단일 GROUP BY 쿼리로 N×3번의 개별 쿼리를 대체한다.
      * 해당 월의 severity별 이벤트 수로 감점:
      *   critical -5 (최대 -30), high -2 (최대 -20), medium -1 (최대 -10)
      */
     @Transactional(readOnly = true)
     public List<Integer> getMonthlyScores(int months) {
-        List<Integer> scores = new ArrayList<>(months);
+        LocalDateTime since = LocalDateTime.now()
+                .minusMonths(months - 1L)
+                .withDayOfMonth(1)
+                .toLocalDate()
+                .atStartOfDay();
+
+        // [yearMonth(YYYYMM), severity, count] 형태로 한 번에 조회
+        List<Object[]> rows = securityEventRepository.countBySeverityGroupedByMonth(since);
+
+        // yearMonth → severity → count 으로 중첩 맵 구성
+        Map<String, Map<String, Long>> byMonth = new HashMap<>();
+        for (Object[] row : rows) {
+            String ym       = (String) row[0];
+            String severity = ((String) row[1]).toLowerCase();
+            long   count    = ((Number) row[2]).longValue();
+            byMonth.computeIfAbsent(ym, k -> new HashMap<>())
+                   .put(severity, count);
+        }
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyyMM");
         LocalDateTime now = LocalDateTime.now();
+        List<Integer> scores = new ArrayList<>(months);
 
         for (int i = months - 1; i >= 0; i--) {
-            LocalDateTime start = now.minusMonths(i)
-                    .withDayOfMonth(1).toLocalDate().atStartOfDay();
-            LocalDateTime end = start.plusMonths(1);
-
-            long critical = securityEventRepository.countBySeverityBetween("critical", start, end);
-            long high     = securityEventRepository.countBySeverityBetween("high",     start, end);
-            long medium   = securityEventRepository.countBySeverityBetween("medium",   start, end);
+            String ym = now.minusMonths(i).format(fmt);
+            Map<String, Long> counts = byMonth.getOrDefault(ym, Map.of());
+            long critical = counts.getOrDefault("critical", 0L);
+            long high     = counts.getOrDefault("high",     0L);
+            long medium   = counts.getOrDefault("medium",   0L);
 
             double penalty = Math.min(critical * 5, 30)
                            + Math.min(high     * 2, 20)

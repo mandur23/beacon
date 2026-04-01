@@ -2,6 +2,7 @@ package com.example.beacon.repository;
 
 import com.example.beacon.entity.Agent;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -34,4 +35,24 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     Long countActiveAgents(@Param("since") LocalDateTime since);
 
     List<Agent> findByStatusAndLastHeartbeatBefore(String status, LocalDateTime threshold);
+
+    @Modifying
+    @Query("UPDATE Agent a SET a.totalEvents = a.totalEvents + 1 WHERE a.agentName = :agentName")
+    int incrementEventCountByName(@Param("agentName") String agentName);
+
+    @Modifying
+    @Query("UPDATE Agent a SET a.totalEvents = a.totalEvents + 1 WHERE a.ipAddress = :ipAddress")
+    int incrementEventCountByIp(@Param("ipAddress") String ipAddress);
+
+    @Modifying
+    @Query("UPDATE Agent a SET a.totalTrafficLogs = a.totalTrafficLogs + 1 WHERE a.agentName = :agentName")
+    int incrementTrafficCountByName(@Param("agentName") String agentName);
+
+    @Modifying
+    @Query("UPDATE Agent a SET a.totalTrafficLogs = a.totalTrafficLogs + 1 WHERE a.ipAddress = :ipAddress")
+    int incrementTrafficCountByIp(@Param("ipAddress") String ipAddress);
+
+    @Modifying
+    @Query("UPDATE Agent a SET a.status = 'offline' WHERE a.status = 'online' AND a.lastHeartbeat < :threshold")
+    int bulkMarkOffline(@Param("threshold") LocalDateTime threshold);
 }

@@ -358,6 +358,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 .search-input:focus { border-color: var(--accent); }
 
+/* date: 네이티브 캘린더 아이콘을 어두운 배경에 맞게 흰색으로 */
+input[type="date"] {
+  color-scheme: dark;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 1;
+  cursor: pointer;
+}
+
 /* ── 상세 패널 ──────────────────────────────────────────────── */
 .detail-top { padding: 12px; background: var(--surface2); border-radius: 8px; margin-bottom: 12px; }
 .detail-row {

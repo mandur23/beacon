@@ -7,7 +7,7 @@
 <!-- 위험도 필터 카드 -->
 <div class="grid-5 mb16">
     <th:block th:each="entry : ${severityCounts}">
-        <a th:href="@{/threats(severity=${entry.key})}"
+        <a th:href="@{/threats(severity=${entry.key}, date=${selectedDate}, search=${search})}"
            class="sev-card"
            th:classappend="${currentSeverity == entry.key} ? ' active'"
            th:data-color="${entry.key == 'critical'} ? '#ff3d5a' :
@@ -36,10 +36,18 @@
     <div class="card-header">
         <div>
             <div class="card-title">이벤트 로그</div>
-            <div class="card-sub" th:text="${#lists.size(events)} + '건 표시'"></div>
+            <div class="card-sub">
+                <span th:text="${#temporals.format(selectedDate, 'yyyy-MM-dd')}">날짜</span>
+                <span> · </span>
+                <span th:text="${#lists.size(events)} + '건'">0건</span>
+            </div>
         </div>
-        <form th:action="@{/threats}" method="get" style="display:flex;gap:8px;align-items:center">
+        <form th:action="@{/threats}" method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input type="hidden" name="severity" th:value="${currentSeverity}"/>
+            <label class="dim" style="font-size:12px;white-space:nowrap">날짜</label>
+            <input type="date" name="date" th:value="${selectedDate}"
+                   class="search-input" style="max-width:160px"
+                   onchange="this.form.submit()"/>
             <input type="text" name="search" th:value="${search}"
                    placeholder="검색 (IP, 유형, ID...)" class="search-input"/>
             <button type="submit" class="btn-sm accent">검색</button>

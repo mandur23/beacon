@@ -1,7 +1,10 @@
 package com.example.beacon.controller;
 
+import com.example.beacon.dto.SecurityEventCreateRequest;
 import com.example.beacon.entity.SecurityEvent;
+import com.example.beacon.service.EventBlockingPolicyService;
 import com.example.beacon.service.SecurityEventService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +24,7 @@ import java.util.Map;
 public class SecurityEventController {
     
     private final SecurityEventService securityEventService;
+    private final EventBlockingPolicyService eventBlockingPolicyService;
     
     @GetMapping
     public ResponseEntity<Page<SecurityEvent>> getEvents(
@@ -85,7 +89,9 @@ public class SecurityEventController {
     }
     
     @PostMapping
-    public ResponseEntity<SecurityEvent> createEvent(@RequestBody SecurityEvent event) {
+    public ResponseEntity<SecurityEvent> createEvent(@Valid @RequestBody SecurityEventCreateRequest request) {
+        SecurityEvent event = request.toEntity();
+        event.setBlocked(eventBlockingPolicyService.resolveBlocked(event));
         return ResponseEntity.ok(securityEventService.createEvent(event));
     }
     

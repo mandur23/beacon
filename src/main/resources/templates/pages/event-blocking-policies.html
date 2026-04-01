@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: layout(~{::body/content})}">
+<body>
+<content>
+
+<div class="card mb16">
+    <div class="card-header">
+        <div>
+            <div class="card-title">에이전트 보안 이벤트 차단 정책</div>
+            <div class="card-sub">
+                API(<code>/api/security-events</code>)로 들어오는 이벤트만 적용됩니다. 에이전트는 탐지 정보만 보내고,
+                차단 여부는 아래 규칙 우선순위(낮은 숫자 먼저)로 첫 일치 시 결정됩니다. 규칙이 없거나 일치하지 않으면 <strong>차단 아님</strong>입니다.
+                Suricata·시스로그 수집 경로는 기존 매핑을 유지합니다.
+            </div>
+        </div>
+        <button class="btn-sm accent" onclick="openAddModal()">+ 정책 추가</button>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+            <tr>
+                <th>순위</th>
+                <th>이름</th>
+                <th>이벤트 유형 패턴</th>
+                <th>심각도</th>
+                <th>소스 IP 접두사</th>
+                <th>결과</th>
+                <th>상태</th>
+                <th>제어</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:if="${policies.isEmpty()}">
+                <td colspan="8" class="dim" style="padding:20px;text-align:center">등록된 정책이 없습니다. 필요 시 규칙을 추가하세요.</td>
+            </tr>
+            <tr th:each="p : ${policies}"
+                th:style="${!p.enabled} ? 'opacity:0.45' : ''"
+                th:data-id="${p.id}"
+                th:data-name="${p.name}"
+                th:data-pattern="${p.eventTypePattern}"
+                th:data-severity="${p.severity != null ? p.severity : ''}"
+                th:data-prefix="${p.sourceIpPrefix != null ? p.sourceIpPrefix : ''}"
+                th:data-blocked="${p.blocked}"
+                th:data-priority="${p.priority}"
+                th:data-enabled="${p.enabled}">
+                <td class="mono dim" style="text-align:center" th:text="${p.priority}"></td>
+                <td style="font-weight:500" th:text="${p.name}"></td>
+                <td class="mono dim" style="font-size:11px" th:text="${p.eventTypePattern}"></td>
+                <td class="dim" th:text="${p.severity != null ? p.severity : '—'}"></td>
+                <td class="mono dim" style="font-size:11px" th:text="${p.sourceIpPrefix != null ? p.sourceIpPrefix : '—'}"></td>
+                <td>
+                    <span class="tag"
+                          th:text="${p.blocked} ? '차단' : '탐지만'"
+                          th:style="${p.blocked} ? 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44' : 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044'"></span>
+                </td>
+                <td>
+                    <span class="tag"
+                          th:text="${p.enabled} ? '활성' : '비활성'"
+                          th:style="${p.enabled} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#4a5570;background:#4a557018;border-color:#4a557044'"></span>
+                </td>
+                <td>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                        <button class="btn-sm dim" onclick="openEditModal(this.closest('tr'))">수정</button>
+                        <button class="btn-sm" style="color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44"
+                                th:data-id="${p.id}" th:data-name="${p.name}" onclick="deletePolicy(this)">삭제</button>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="padding:16px 20px">
+    <div class="card-title mb8">패턴 도움말</div>
+    <ul class="dim" style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">
+        <li><code>*</code> — 모든 이벤트 유형</li>
+        <li><code>FILE_*</code> — <code>FILE_</code>로 시작하는 유형</li>
+        <li><code>FILE_MODIFIED</code> — 정확히 일치</li>
+        <li>심각도·IP 접두사를 비우면 해당 조건은 무시됩니다.</li>
+    </ul>
+</div>
+
+<div id="addModal" class="modal-overlay" style="display:none">
+    <div class="card modal-box">
+        <div class="card-header">
+            <div class="card-title">정책 추가</div>
+            <button onclick="closeAddModal()" class="btn-icon">×</button>
+        </div>
+        <div style="padding:16px 20px">
+            <div class="modal-field">
+                <label>이름 *</label>
+                <input type="text" id="addName" placeholder="예: 특정 IP의 파일 변경 차단"/>
+            </div>
+            <div class="modal-field">
+                <label>이벤트 유형 패턴 *</label>
+                <input type="text" id="addPattern" placeholder="* 또는 FILE_* 또는 FILE_MODIFIED"/>
+            </div>
+            <div class="modal-field">
+                <label>심각도 (비우면 무관)</label>
+                <input type="text" id="addSeverity" placeholder="예: HIGH"/>
+            </div>
+            <div class="modal-field">
+                <label>소스 IP 접두사 (비우면 무관)</label>
+                <input type="text" id="addPrefix" placeholder="예: 10.0.4."/>
+            </div>
+            <div class="modal-field">
+                <label>일치 시 결과 *</label>
+                <select id="addBlocked">
+                    <option value="true">차단으로 기록</option>
+                    <option value="false">탐지만 (차단 아님)</option>
+                </select>
+            </div>
+            <div class="modal-field">
+                <label>우선순위 (낮을수록 먼저 적용) *</label>
+                <input type="number" id="addPriority" value="10" min="0"/>
+            </div>
+            <div class="modal-field">
+                <label>활성</label>
+                <select id="addEnabled">
+                    <option value="true">예</option>
+                    <option value="false">아니오</option>
+                </select>
+            </div>
+            <div class="detail-actions">
+                <button class="btn-accent" onclick="submitAdd()">추가</button>
+                <button class="btn-sm dim" onclick="closeAddModal()">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal-overlay" style="display:none">
+    <div class="card modal-box">
+        <div class="card-header">
+            <div class="card-title">정책 수정</div>
+            <button onclick="closeEditModal()" class="btn-icon">×</button>
+        </div>
+        <div style="padding:16px 20px">
+            <input type="hidden" id="editId"/>
+            <div class="modal-field">
+                <label>이름 *</label>
+                <input type="text" id="editName"/>
+            </div>
+            <div class="modal-field">
+                <label>이벤트 유형 패턴 *</label>
+                <input type="text" id="editPattern"/>
+            </div>
+            <div class="modal-field">
+                <label>심각도 (비우면 무관)</label>
+                <input type="text" id="editSeverity"/>
+            </div>
+            <div class="modal-field">
+                <label>소스 IP 접두사 (비우면 무관)</label>
+                <input type="text" id="editPrefix"/>
+            </div>
+            <div class="modal-field">
+                <label>일치 시 결과 *</label>
+                <select id="editBlocked">
+                    <option value="true">차단으로 기록</option>
+                    <option value="false">탐지만 (차단 아님)</option>
+                </select>
+            </div>
+            <div class="modal-field">
+                <label>우선순위 *</label>
+                <input type="number" id="editPriority" min="0"/>
+            </div>
+            <div class="modal-field">
+                <label>활성</label>
+                <select id="editEnabled">
+                    <option value="true">예</option>
+                    <option value="false">아니오</option>
+                </select>
+            </div>
+            <div class="detail-actions">
+                <button class="btn-accent" onclick="submitEdit()">저장</button>
+                <button class="btn-sm dim" onclick="closeEditModal()">취소</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addName').value = '';
+    document.getElementById('addPattern').value = '*';
+    document.getElementById('addSeverity').value = '';
+    document.getElementById('addPrefix').value = '';
+    document.getElementById('addBlocked').value = 'false';
+    document.getElementById('addPriority').value = '10';
+    document.getElementById('addEnabled').value = 'true';
+    document.getElementById('addModal').style.display = 'flex';
+}
+function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+
+function submitAdd() {
+    const body = {
+        name: document.getElementById('addName').value.trim(),
+        eventTypePattern: document.getElementById('addPattern').value.trim() || '*',
+        severity: document.getElementById('addSeverity').value.trim(),
+        sourceIpPrefix: document.getElementById('addPrefix').value.trim(),
+        blocked: document.getElementById('addBlocked').value === 'true',
+        priority: parseInt(document.getElementById('addPriority').value, 10) || 0,
+        enabled: document.getElementById('addEnabled').value === 'true'
+    };
+    if (!body.name) { showToast('이름을 입력하세요', 'error'); return; }
+    fetch('/api/event-blocking-policies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) { closeAddModal(); location.reload(); }
+    })
+    .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+function openEditModal(row) {
+    const d = row.dataset;
+    document.getElementById('editId').value = d.id;
+    document.getElementById('editName').value = d.name;
+    document.getElementById('editPattern').value = d.pattern;
+    document.getElementById('editSeverity').value = d.severity || '';
+    document.getElementById('editPrefix').value = d.prefix || '';
+    document.getElementById('editBlocked').value = d.blocked === 'true' ? 'true' : 'false';
+    document.getElementById('editPriority').value = d.priority;
+    document.getElementById('editEnabled').value = d.enabled === 'true' ? 'true' : 'false';
+    document.getElementById('editModal').style.display = 'flex';
+}
+function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
+
+function submitEdit() {
+    const id = document.getElementById('editId').value;
+    const body = {
+        name: document.getElementById('editName').value.trim(),
+        eventTypePattern: document.getElementById('editPattern').value.trim() || '*',
+        severity: document.getElementById('editSeverity').value.trim(),
+        sourceIpPrefix: document.getElementById('editPrefix').value.trim(),
+        blocked: document.getElementById('editBlocked').value === 'true',
+        priority: parseInt(document.getElementById('editPriority').value, 10) || 0,
+        enabled: document.getElementById('editEnabled').value === 'true'
+    };
+    if (!body.name) { showToast('이름을 입력하세요', 'error'); return; }
+    fetch('/api/event-blocking-policies/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) { closeEditModal(); location.reload(); }
+    })
+    .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+function deletePolicy(btn) {
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    if (!confirm("'" + name + "' 정책을 삭제하시겠습니까?")) return;
+    fetch('/api/event-blocking-policies/' + id, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) location.reload();
+        })
+        .catch(() => showToast('오류가 발생했습니다', 'error'));
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closeAddModal();
+        closeEditModal();
+    }
+});
+</script>
+
+</content>
+</body>
+</html>

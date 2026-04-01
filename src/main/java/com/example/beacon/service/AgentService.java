@@ -22,8 +22,8 @@ public class AgentService {
     private static final int HEARTBEAT_TIMEOUT_MINUTES = 5;
     
     @Transactional
-    public Agent registerOrUpdateAgent(String agentName, String hostname, String ipAddress, 
-                                      String osType, String osVersion, String agentVersion, 
+    public Agent registerOrUpdateAgent(String agentName, String hostname, String ipAddress,
+                                      String osType, String osVersion, String agentVersion,
                                       String username, String metadata) {
         Optional<Agent> existing = agentRepository.findByAgentName(agentName);
         
@@ -68,37 +68,38 @@ public class AgentService {
             agentRepository.save(agent);
         });
     }
-    
+
+    /**
+     * 단일 UPDATE 쿼리로 에이전트 이벤트 카운터를 증가시킨다.
+     * 이름에 해당하는 에이전트가 없으면 조용히 무시한다.
+     */
     @Transactional
     public void incrementEventCount(String agentName) {
-        agentRepository.findByAgentName(agentName).ifPresent(agent -> {
-            agent.setTotalEvents(agent.getTotalEvents() + 1);
-            agentRepository.save(agent);
-        });
+        agentRepository.incrementEventCountByName(agentName);
     }
-    
+
+    /**
+     * 단일 UPDATE 쿼리로 IP 기반 에이전트 이벤트 카운터를 증가시킨다.
+     */
     @Transactional
     public void incrementEventCountByIp(String ipAddress) {
-        agentRepository.findByIpAddress(ipAddress).ifPresent(agent -> {
-            agent.setTotalEvents(agent.getTotalEvents() + 1);
-            agentRepository.save(agent);
-        });
+        agentRepository.incrementEventCountByIp(ipAddress);
     }
-    
+
+    /**
+     * 단일 UPDATE 쿼리로 에이전트 트래픽 카운터를 증가시킨다.
+     */
     @Transactional
     public void incrementTrafficCount(String agentName) {
-        agentRepository.findByAgentName(agentName).ifPresent(agent -> {
-            agent.setTotalTrafficLogs(agent.getTotalTrafficLogs() + 1);
-            agentRepository.save(agent);
-        });
+        agentRepository.incrementTrafficCountByName(agentName);
     }
-    
+
+    /**
+     * 단일 UPDATE 쿼리로 IP 기반 에이전트 트래픽 카운터를 증가시킨다.
+     */
     @Transactional
     public void incrementTrafficCountByIp(String ipAddress) {
-        agentRepository.findByIpAddress(ipAddress).ifPresent(agent -> {
-            agent.setTotalTrafficLogs(agent.getTotalTrafficLogs() + 1);
-            agentRepository.save(agent);
-        });
+        agentRepository.incrementTrafficCountByIp(ipAddress);
     }
     
     @Transactional(readOnly = true)
@@ -123,22 +124,18 @@ public class AgentService {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(HEARTBEAT_TIMEOUT_MINUTES);
         return agentRepository.countActiveAgents(threshold);
     }
-    
+
+    /**
+     * 타임아웃된 에이전트를 단일 벌크 UPDATE 쿼리로 offline 처리한다.
+     * 스케줄러에 의해 60초마다 자동 실행된다.
+     */
     @Scheduled(fixedRate = 60000)
     @Transactional
     public void updateAgentStatus() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(HEARTBEAT_TIMEOUT_MINUTES);
-
-        List<Agent> timedOutAgents = agentRepository.findByStatusAndLastHeartbeatBefore("online", threshold);
-        timedOutAgents.forEach(agent -> {
-            agent.setStatus("offline");
-            agentRepository.save(agent);
-            log.warn("Agent timed out, marked offline: {} (last heartbeat: {})",
-                    agent.getAgentName(), agent.getLastHeartbeat());
-        });
-
-        if (!timedOutAgents.isEmpty()) {
-            log.info("Offline status applied to {} agent(s)", timedOutAgents.size());
+        int updated = agentRepository.bulkMarkOffline(threshold);
+        if (updated > 0) {
+            log.warn("Offline 처리된 에이전트 수: {}", updated);
         }
     }
 

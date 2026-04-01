@@ -33,77 +33,211 @@
     <div class="card span-8">
         <div class="card-header">
             <div class="card-title">네트워크 토폴로지</div>
-            <div class="card-sub">실시간 네트워크 구성도</div>
+            <div style="display:flex;align-items:center;gap:8px">
+                <span id="topoStatus" class="tag" style="color:#ffd166;background:#ffd16618;border-color:#ffd16644;font-size:11px">연결 중...</span>
+                <span class="card-sub">실시간 네트워크 구성도</span>
+            </div>
         </div>
         <div style="padding:12px 16px">
             <svg id="topoSvg" width="100%" height="280" viewBox="0 0 100 100"></svg>
-            <div class="legend" style="justify-content:center;margin-top:8px">
+            <div class="legend" style="justify-content:center;margin-top:8px;flex-wrap:wrap;gap:4px">
                 <span class="legend-item red">● 방화벽</span>
                 <span class="legend-item accent">● 영역</span>
                 <span class="legend-item green">● 서버</span>
                 <span class="legend-item yellow">● 센서</span>
+                <span style="color:#a78bfa;font-size:12px">● 에이전트</span>
+                <span style="margin-left:8px;font-size:11px;color:#4a5570">
+                    정상 <span id="topoOk" style="color:#06d6a0">-</span>
+                    경고 <span id="topoWarn" style="color:#ffd166">-</span>
+                    오류 <span id="topoErr" style="color:#ff3d5a">-</span>
+                    · 온라인 에이전트 <span id="topoAgentOnline" style="color:#a78bfa">0</span>/<span id="topoAgentTotal" style="color:#4a5570">0</span>
+                </span>
             </div>
         </div>
     </div>
     <div class="card span-4">
-        <div class="card-header"><div class="card-title">장비 상태</div></div>
-        <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
-            <div th:each="n : ${nodes}" class="node-row">
-                <span class="dot"
-                      th:style="${n.status == 'ok'} ? 'background:#06d6a0' : 'background:#ffd166'"></span>
-                <div style="flex:1">
-                    <div class="node-label" th:text="${n.label}"></div>
-                    <div class="node-sub" th:text="${n.id} + ' · ' + ${n.type}"></div>
-                </div>
-                <span class="tag"
-                      th:text="${n.status == 'ok'} ? '정상' : '경고'"
-                      th:style="${n.status == 'ok'} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ffd166;background:#ffd16618;border-color:#ffd16644'">
-                </span>
-            </div>
+        <div class="card-header">
+            <div class="card-title">장비 상태</div>
+            <span id="topoLastUpdate" style="font-size:10px;color:#4a5570"></span>
+        </div>
+        <div id="nodeStatusList" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <div class="dim" style="font-size:12px;text-align:center;padding:16px">로딩 중...</div>
         </div>
     </div>
 </div>
 <script th:inline="none">
 (function() {
-    const nodes = [
-        {id:"FW",label:"방화벽",x:50,y:50,type:"firewall"},
-        {id:"DMZ",label:"DMZ",x:50,y:25,type:"zone"},
-        {id:"WEB",label:"웹서버",x:28,y:12,type:"server"},
-        {id:"API",label:"API서버",x:72,y:12,type:"server"},
-        {id:"INT",label:"내부망",x:50,y:75,type:"zone"},
-        {id:"DB",label:"DB서버",x:28,y:90,type:"server"},
-        {id:"APP",label:"앱서버",x:72,y:90,type:"server"},
-        {id:"IDS",label:"IDS",x:82,y:50,type:"sensor"},
-    ];
-    const links = [["FW","DMZ"],["FW","INT"],["DMZ","WEB"],["DMZ","API"],["INT","DB"],["INT","APP"],["FW","IDS"]];
-    const colors = {firewall:"#ff3d5a",zone:"#00e5ff",server:"#06d6a0",sensor:"#ffd166"};
-    const svg = document.getElementById('topoSvg');
     const ns = "http://www.w3.org/2000/svg";
+    const svg = document.getElementById('topoSvg');
 
-    links.forEach(([a,b]) => {
-        const na = nodes.find(n=>n.id===a), nb = nodes.find(n=>n.id===b);
-        const line = document.createElementNS(ns,"line");
-        Object.assign(line, {});
-        line.setAttribute("x1",na.x); line.setAttribute("y1",na.y);
-        line.setAttribute("x2",nb.x); line.setAttribute("y2",nb.y);
-        line.setAttribute("stroke","#1e2235"); line.setAttribute("stroke-width","0.5");
-        svg.appendChild(line);
-    });
-    nodes.forEach(n => {
-        const c = colors[n.type];
-        const g = document.createElementNS(ns,"g");
-        const circle = document.createElementNS(ns,"circle");
-        circle.setAttribute("cx",n.x); circle.setAttribute("cy",n.y); circle.setAttribute("r","5");
-        circle.setAttribute("fill",c+"22"); circle.setAttribute("stroke",c); circle.setAttribute("stroke-width","0.7");
-        const dot = document.createElementNS(ns,"circle");
-        dot.setAttribute("cx",n.x); dot.setAttribute("cy",n.y); dot.setAttribute("r","1.8"); dot.setAttribute("fill",c);
-        const text = document.createElementNS(ns,"text");
-        text.setAttribute("x",n.x); text.setAttribute("y",n.y+9);
-        text.setAttribute("text-anchor","middle"); text.setAttribute("font-size","3.5"); text.setAttribute("fill","#4a5570");
-        text.textContent = n.label;
-        g.appendChild(circle); g.appendChild(dot); g.appendChild(text);
-        svg.appendChild(g);
-    });
+    const TYPE_COLOR   = {firewall:"#ff3d5a", zone:"#00e5ff", server:"#06d6a0", sensor:"#ffd166", agent:"#a78bfa"};
+    const STATUS_COLOR = {ok:"#06d6a0", warn:"#ffd166", error:"#ff3d5a"};
+    const STATUS_LABEL = {ok:"정상", warn:"경고", error:"오류"};
+
+    // 에이전트는 크기를 작게
+    const NODE_R     = {firewall:5, zone:5, server:5, sensor:5, agent:3.5};
+    const NODE_DOT_R = {firewall:1.8, zone:1.8, server:1.8, sensor:1.8, agent:1.3};
+    const NODE_FONT  = {firewall:3.5, zone:3.5, server:3.5, sensor:3.5, agent:3};
+
+    // 폴링마다 SVG를 완전 재구성 (에이전트가 동적으로 추가/제거되므로)
+    function buildSvg(nodes, links, viewBoxH, hasAgents) {
+        svg.setAttribute('viewBox', '0 0 100 ' + viewBoxH);
+
+        // SVG 높이를 viewBoxH에 비례해서 조정
+        svg.setAttribute('height', Math.round(280 * viewBoxH / 100));
+
+        svg.innerHTML = '';
+
+        // 에이전트 구분 영역 배경 (에이전트가 있을 때만)
+        if (hasAgents) {
+            const sepBg = document.createElementNS(ns, 'rect');
+            sepBg.setAttribute('x', '0'); sepBg.setAttribute('y', '104');
+            sepBg.setAttribute('width', '100'); sepBg.setAttribute('height', viewBoxH - 104);
+            sepBg.setAttribute('fill', '#a78bfa08');
+            sepBg.setAttribute('stroke', '#a78bfa22');
+            sepBg.setAttribute('stroke-width', '0.3');
+            svg.appendChild(sepBg);
+
+            const sepLabel = document.createElementNS(ns, 'text');
+            sepLabel.setAttribute('x', '50'); sepLabel.setAttribute('y', '109');
+            sepLabel.setAttribute('text-anchor', 'middle');
+            sepLabel.setAttribute('font-size', '3');
+            sepLabel.setAttribute('fill', '#a78bfa88');
+            sepLabel.textContent = '── 온라인 에이전트 ──';
+            svg.appendChild(sepLabel);
+        }
+
+        // 링크
+        links.forEach(lk => {
+            const na = nodes.find(n => n.id === lk.from);
+            const nb = nodes.find(n => n.id === lk.to);
+            if (!na || !nb) return;
+            const isAgentLink = lk.to.startsWith('AG-');
+            const line = document.createElementNS(ns, 'line');
+            line.setAttribute('x1', na.x); line.setAttribute('y1', na.y);
+            line.setAttribute('x2', nb.x); line.setAttribute('y2', nb.y);
+            line.setAttribute('stroke', isAgentLink ? '#a78bfa33' : (lk.active ? '#2a3248' : '#1a1f30'));
+            line.setAttribute('stroke-width', isAgentLink ? '0.3' : '0.5');
+            line.setAttribute('stroke-dasharray', (!lk.active && !isAgentLink) ? '2 1' : 'none');
+            svg.appendChild(line);
+        });
+
+        // 노드
+        nodes.forEach(n => {
+            const baseColor = TYPE_COLOR[n.type] || '#4a5570';
+            const sc = n.type === 'agent' ? baseColor : (STATUS_COLOR[n.status] || baseColor);
+            const r    = NODE_R[n.type]     || 5;
+            const dotR = NODE_DOT_R[n.type] || 1.8;
+            const fs   = NODE_FONT[n.type]  || 3.5;
+
+            const g = document.createElementNS(ns, 'g');
+            g.style.cursor = 'default';
+
+            const title = document.createElementNS(ns, 'title');
+            title.textContent = n.label + ' · ' + (STATUS_LABEL[n.status] || n.status)
+                              + '\n' + n.detail;
+            g.appendChild(title);
+
+            const ring = document.createElementNS(ns, 'circle');
+            ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', r);
+            ring.setAttribute('fill', sc + '22'); ring.setAttribute('stroke', sc);
+            ring.setAttribute('stroke-width', n.type === 'agent' ? '0.5' : '0.7');
+
+            const dot = document.createElementNS(ns, 'circle');
+            dot.setAttribute('cx', n.x); dot.setAttribute('cy', n.y); dot.setAttribute('r', dotR);
+            dot.setAttribute('fill', sc);
+
+            const label = document.createElementNS(ns, 'text');
+            label.setAttribute('x', n.x); label.setAttribute('y', n.y + r + 3.5);
+            label.setAttribute('text-anchor', 'middle'); label.setAttribute('font-size', fs);
+            label.setAttribute('fill', n.type === 'agent' ? '#a78bfa99' : '#4a5570');
+            label.textContent = n.label;
+
+            g.appendChild(ring); g.appendChild(dot); g.appendChild(label);
+            svg.appendChild(g);
+        });
+    }
+
+    function updateStatusPanel(nodes) {
+        const list = document.getElementById('nodeStatusList');
+        if (!list) return;
+
+        const infra  = nodes.filter(n => n.type !== 'agent');
+        const agents = nodes.filter(n => n.type === 'agent');
+
+        let html = infra.map(n => renderRow(n)).join('');
+
+        if (agents.length > 0) {
+            html += `<div style="font-size:10px;color:#a78bfa88;margin:4px 0 2px;padding-top:4px;border-top:1px solid #a78bfa22">
+                        온라인 에이전트 (${agents.length})
+                     </div>`;
+            html += agents.map(n => renderRow(n)).join('');
+        }
+
+        list.innerHTML = html;
+    }
+
+    function renderRow(n) {
+        const sc = n.type === 'agent' ? '#a78bfa' : (STATUS_COLOR[n.status] || '#4a5570');
+        const sl = n.type === 'agent' ? '온라인' : (STATUS_LABEL[n.status] || n.status);
+        return `<div class="node-row">
+            <span class="dot" style="background:${sc}"></span>
+            <div style="flex:1;min-width:0">
+                <div class="node-label" style="${n.type==='agent'?'color:#a78bfa':''}">
+                    ${n.label}
+                </div>
+                <div class="node-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    ${n.detail}
+                </div>
+            </div>
+            <span class="tag" style="color:${sc};background:${sc}18;border-color:${sc}44;white-space:nowrap">${sl}</span>
+        </div>`;
+    }
+
+    function updateSummary(summary) {
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '-'; };
+        set('topoOk',          summary.ok);
+        set('topoWarn',        summary.warn);
+        set('topoErr',         summary.error);
+        set('topoAgentOnline', summary.agentOnline ?? 0);
+        set('topoAgentTotal',  summary.agentTotal  ?? 0);
+
+        const statusEl = document.getElementById('topoStatus');
+        if (statusEl) {
+            if ((summary.error ?? 0) > 0) {
+                statusEl.textContent = '오류 감지';
+                statusEl.style.cssText = 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44;font-size:11px';
+            } else if ((summary.warn ?? 0) > 0) {
+                statusEl.textContent = '경고';
+                statusEl.style.cssText = 'color:#ffd166;background:#ffd16618;border-color:#ffd16644;font-size:11px';
+            } else {
+                statusEl.textContent = '정상';
+                statusEl.style.cssText = 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044;font-size:11px';
+            }
+        }
+    }
+
+    function poll() {
+        fetch('/api/network/topology')
+            .then(r => r.json())
+            .then(data => {
+                buildSvg(data.nodes, data.links, data.viewBoxH || 100, data.hasAgents);
+                updateStatusPanel(data.nodes);
+                updateSummary(data.summary);
+                const upd = document.getElementById('topoLastUpdate');
+                if (upd) upd.textContent = new Date(data.timestamp).toLocaleTimeString('ko-KR');
+            })
+            .catch(() => {
+                const statusEl = document.getElementById('topoStatus');
+                if (statusEl) {
+                    statusEl.textContent = '연결 끊김';
+                    statusEl.style.cssText = 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44;font-size:11px';
+                }
+            });
+    }
+
+    poll();
+    setInterval(poll, 5000);
 })();
 </script>
 </th:block>

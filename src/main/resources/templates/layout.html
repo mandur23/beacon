@@ -42,6 +42,9 @@
         <a th:href="@{/firewall}" th:classappend="${page == 'firewall'} ? ' active'" class="nav-item">
             <span class="nav-icon">⊞</span><span class="nav-label">방화벽 / 정책</span>
         </a>
+        <a th:href="@{/policies/event-blocking}" th:classappend="${page == 'event-blocking'} ? ' active'" class="nav-item">
+            <span class="nav-icon">⛶</span><span class="nav-label">이벤트 차단 정책</span>
+        </a>
         <a th:href="@{/reports}" th:classappend="${page == 'reports'} ? ' active'" class="nav-item">
             <span class="nav-icon">◧</span><span class="nav-label">보고서 / 분석</span>
         </a>

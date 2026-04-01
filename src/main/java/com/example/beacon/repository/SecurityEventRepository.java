@@ -41,6 +41,22 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
            "ORDER BY e.createdAt DESC")
     List<SecurityEvent> findWithFilters(@Param("severity") String severity, @Param("search") String search);
 
+    @Query("SELECT e FROM SecurityEvent e WHERE " +
+           "(:severity = 'all' OR e.severity = :severity) AND " +
+           "(:search = '' OR LOWER(e.sourceIp) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(e.eventType) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "e.createdAt >= :start AND e.createdAt < :end " +
+           "ORDER BY e.createdAt DESC")
+    List<SecurityEvent> findWithFiltersAndDateRange(@Param("severity") String severity,
+                                                    @Param("search") String search,
+                                                    @Param("start") LocalDateTime start,
+                                                    @Param("end") LocalDateTime end);
+
+    @Query("SELECT e.severity, COUNT(e) FROM SecurityEvent e WHERE " +
+           "e.createdAt >= :start AND e.createdAt < :end GROUP BY e.severity")
+    List<Object[]> countBySeverityInDateRange(@Param("start") LocalDateTime start,
+                                              @Param("end") LocalDateTime end);
+
     @Query("SELECT HOUR(e.createdAt), COUNT(e) FROM SecurityEvent e WHERE e.createdAt >= :since GROUP BY HOUR(e.createdAt)")
     List<Object[]> countByHour(@Param("since") LocalDateTime since);
 
@@ -73,4 +89,25 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
     Long countBySeverityBetween(@Param("severity") String severity,
                                 @Param("start")    LocalDateTime start,
                                 @Param("end")      LocalDateTime end);
+
+    /**
+     * 기간 내 연월(YYYYMM 형식)과 severity별 이벤트 수를 한 번에 집계한다.
+     * getMonthlyScores() 에서 N×3 쿼리 대신 단일 쿼리로 대체하기 위해 사용한다.
+     * 반환: [yearMonth(String), severity(String), count(Long)]
+     */
+    @Query("SELECT FUNCTION('DATE_FORMAT', e.createdAt, '%Y%m'), e.severity, COUNT(e) " +
+           "FROM SecurityEvent e " +
+           "WHERE e.createdAt >= :since AND e.severity IN ('critical','high','medium') " +
+           "GROUP BY FUNCTION('DATE_FORMAT', e.createdAt, '%Y%m'), e.severity")
+    List<Object[]> countBySeverityGroupedByMonth(@Param("since") LocalDateTime since);
+
+    /**
+     * 미해결 이벤트를 severity별로 한 번에 집계한다.
+     * calculateSecurityScore() 에서 4번의 단건 쿼리 대신 단일 쿼리로 대체한다.
+     * 반환: [severity(String), count(Long)]
+     */
+    @Query("SELECT e.severity, COUNT(e) FROM SecurityEvent e " +
+           "WHERE e.status = 'pending' OR e.status = '조사중' " +
+           "GROUP BY e.severity")
+    List<Object[]> countUnresolvedGroupedBySeverity();
 }

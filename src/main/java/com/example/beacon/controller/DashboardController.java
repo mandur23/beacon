@@ -6,6 +6,7 @@ import com.example.beacon.entity.SecurityEvent;
 import com.example.beacon.entity.User;
 import com.example.beacon.repository.UserRepository;
 import com.example.beacon.service.AgentService;
+import com.example.beacon.service.EventBlockingPolicyService;
 import com.example.beacon.service.FirewallService;
 import com.example.beacon.service.NetworkStatsService;
 import com.example.beacon.service.SecurityEventService;
@@ -14,9 +15,11 @@ import com.example.beacon.service.UserSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -32,7 +35,8 @@ public class DashboardController {
     private final SecurityEventService  securityEventService;
     private final TrafficAnalysisService trafficAnalysisService;
     private final UserSessionService    userSessionService;
-    private final FirewallService       firewallService;
+    private final FirewallService             firewallService;
+    private final EventBlockingPolicyService  eventBlockingPolicyService;
     private final UserRepository        userRepository;
     private final AgentService          agentService;
     private final NetworkStatsService   networkStatsService;
@@ -75,14 +79,19 @@ public class DashboardController {
     @GetMapping("/threats")
     public String threats(Model model,
                           @RequestParam(defaultValue = "all") String severity,
-                          @RequestParam(defaultValue = "") String search) {
+                          @RequestParam(defaultValue = "") String search,
+                          @RequestParam(required = false)
+                          @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        LocalDate selectedDate = date != null ? date : LocalDate.now();
+
         model.addAttribute("page", "threats");
         model.addAttribute("pageTitle", "위협 / 이벤트 로그");
-        model.addAttribute("severityCounts", securityEventService.getSeverityCounts());
+        model.addAttribute("severityCounts", securityEventService.getSeverityCountsForDate(selectedDate));
         model.addAttribute("currentSeverity", severity);
         model.addAttribute("search", search);
+        model.addAttribute("selectedDate", selectedDate);
 
-        List<Map<String, Object>> events = securityEventService.getEventsWithFilters(severity, search)
+        List<Map<String, Object>> events = securityEventService.getEventsWithFiltersForDate(severity, search, selectedDate)
                 .stream().map(this::toEventMap).collect(Collectors.toList());
         model.addAttribute("events", events);
 
@@ -120,7 +129,6 @@ public class DashboardController {
         ));
 
         // 토폴로지 노드: 등록된 에이전트 기반, 없을 경우 안내 노드 표시
-        agentService.updateAgentStatus();
         List<Agent> agentsForTopology = agentService.getAllAgents();
         List<Map<String, Object>> nodes;
         if (agentsForTopology.isEmpty()) {
@@ -197,6 +205,14 @@ public class DashboardController {
         return "pages/firewall";
     }
 
+    @GetMapping("/policies/event-blocking")
+    public String eventBlockingPolicies(Model model) {
+        model.addAttribute("page", "event-blocking");
+        model.addAttribute("pageTitle", "이벤트 차단 정책");
+        model.addAttribute("policies", eventBlockingPolicyService.findAllOrdered());
+        return "pages/event-blocking-policies";
+    }
+
     @GetMapping("/reports")
     public String reports(Model model) {
         model.addAttribute("page", "reports");
@@ -232,9 +248,7 @@ public class DashboardController {
     public String agents(Model model) {
         model.addAttribute("page", "agents");
         model.addAttribute("pageTitle", "에이전트 관리");
-        
-        agentService.updateAgentStatus();
-        
+
         List<Agent> allAgents = agentService.getAllAgents();
         Long onlineCount = agentService.getOnlineAgentCount();
         

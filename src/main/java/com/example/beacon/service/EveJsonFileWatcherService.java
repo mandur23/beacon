@@ -1,5 +1,6 @@
 package com.example.beacon.service;
 
+import com.example.beacon.entity.EventSource;
 import com.example.beacon.entity.SecurityEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -188,7 +189,7 @@ public class EveJsonFileWatcherService {
                 return;
             }
 
-            SecurityEvent event = suricataEventMapper.mapToSecurityEvent(root, line);
+            SecurityEvent event = suricataEventMapper.mapToSecurityEvent(root, line, EventSource.SURICATA);
             securityEventService.createEvent(event);
             log.info("[EveWatcher] SecurityEvent 저장 완료 - type={}, src={}", event.getEventType(), event.getSourceIp());
         } catch (Exception e) {

@@ -1,5 +1,7 @@
 package com.example.beacon.service;
 
+import com.example.beacon.dto.SecurityEventCreateRequest;
+import com.example.beacon.entity.EventSource;
 import com.example.beacon.entity.SecurityEvent;
 import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.SecurityEventRepository;
@@ -25,22 +27,58 @@ public class SecurityEventService {
     
     private final SecurityEventRepository securityEventRepository;
     private final AgentService agentService;
-    
+    private final FirewallService firewallService;
+    private final FirewallHitsBatchService firewallHitsBatchService;
+    private final EventBlockingPolicyService eventBlockingPolicyService;
+
     @Transactional
     public SecurityEvent createEvent(SecurityEvent event) {
+        // blocked=true 로 결정된 이벤트는 상태값도 "차단됨"으로 정합성 유지
+        if (Boolean.TRUE.equals(event.getBlocked())
+                && (event.getStatus() == null
+                || event.getStatus().isBlank()
+                || "pending".equalsIgnoreCase(event.getStatus())
+                || "탐지됨".equals(event.getStatus()))) {
+            event.setStatus("차단됨");
+        }
+
         SecurityEvent saved = securityEventRepository.save(event);
-        
+
         if (event.getSourceIp() != null) {
             try {
                 agentService.incrementEventCountByIp(event.getSourceIp());
             } catch (Exception e) {
                 log.warn("Failed to increment agent event count: {}", e.getMessage());
             }
+            // 메모리 카운터에만 기록, 3초 주기 배치로 DB flush
+            firewallHitsBatchService.recordHit(event.getSourceIp());
         }
-        
+
         return saved;
     }
     
+    /**
+     * 에이전트 API를 통해 수신된 이벤트를 저장한다.
+     * 컨트롤러에서 분산되어 있던 오케스트레이션을 단일 트랜잭션으로 통합한다:
+     *  1. EventBlockingPolicy 매칭으로 blocked 여부 결정
+     *  2. blocked=true 이면 방화벽 차단 규칙 자동 등록 (REQUIRES_NEW)
+     *  3. 이벤트 저장 (createEvent)
+     */
+    @Transactional
+    public SecurityEvent createAgentEvent(SecurityEventCreateRequest request) {
+        SecurityEvent event = request.toEntity();
+        boolean blocked = eventBlockingPolicyService.resolveBlocked(event);
+        event.setBlocked(blocked);
+
+        if (blocked && event.getSourceIp() != null && !event.getSourceIp().isBlank()) {
+            String reason = "정책 자동 차단: " + event.getEventType()
+                    + " [severity=" + event.getSeverity() + "]";
+            firewallService.createBlockRuleForIp(event.getSourceIp(), reason, "system-policy");
+        }
+
+        return createEvent(event);
+    }
+
     @Transactional(readOnly = true)
     public Page<SecurityEvent> getEvents(Pageable pageable) {
         return securityEventRepository.findAll(pageable);
@@ -89,6 +127,39 @@ public class SecurityEventService {
         event.setResolvedAt(LocalDateTime.now());
         event.setHandledBy(handledBy);
         return securityEventRepository.save(event);
+    }
+
+    /**
+     * 관리자가 위협 화면에서 수동으로 IP를 차단할 때 호출한다.
+     * 단일 트랜잭션 안에서:
+     *  1. sourceIp 유효성을 DB 쓰기 전에 검증해 불필요한 롤백을 방지한다.
+     *  2. 이벤트 상태를 "차단됨"으로 변경하고 source=MANUAL을 DB에 저장한다.
+     *  3. 해당 IP의 방화벽 차단 규칙을 생성한다(이미 있으면 재사용).
+     * 규칙 생성이 실패하면 이벤트 상태 변경도 함께 롤백된다.
+     *
+     * @throws IllegalArgumentException 이벤트의 sourceIp가 없거나 비어 있는 경우 (→ 400)
+     */
+    @Transactional
+    public SecurityEvent blockEventManually(Long eventId, String handledBy) {
+        SecurityEvent event = securityEventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("SecurityEvent", eventId));
+
+        // DB 쓰기 전 사전 검증: 레거시·비정상 데이터 방어
+        if (event.getSourceIp() == null || event.getSourceIp().isBlank()) {
+            throw new IllegalArgumentException(
+                    "이벤트 #" + eventId + "의 소스 IP가 없어 방화벽 규칙을 등록할 수 없습니다.");
+        }
+
+        event.setStatus("차단됨");
+        event.setResolvedAt(LocalDateTime.now());
+        event.setHandledBy(handledBy);
+        event.setSource(EventSource.MANUAL);
+        SecurityEvent saved = securityEventRepository.save(event);
+
+        String reason = "이벤트 #" + eventId + " 수동 차단 (" + saved.getEventType() + ")";
+        firewallService.createBlockRuleForIp(saved.getSourceIp(), reason, handledBy);
+
+        return saved;
     }
 
     @Transactional

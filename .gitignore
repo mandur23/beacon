@@ -50,8 +50,15 @@ python-ml/*.log
 ### Application ###
 application-local.yaml
 application-prod.yaml
+application-*.yaml
+!application-local.yaml.example
 *.log
 logs/
+
+### Secrets ###
+.env
+.env.*
+!.env.example
 
 ### Database ###
 *.db

@@ -4,6 +4,7 @@ import com.example.beacon.dto.AgentHeartbeatRequest;
 import com.example.beacon.dto.AgentRegisterRequest;
 import com.example.beacon.entity.Agent;
 import com.example.beacon.service.AgentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,7 @@ public class AgentController {
     private final AgentService agentService;
     
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> registerAgent(@RequestBody AgentRegisterRequest request) {
+    public ResponseEntity<Map<String, Object>> registerAgent(@Valid @RequestBody AgentRegisterRequest request) {
         Agent agent = agentService.registerOrUpdateAgent(
                 request.getAgentName(),
                 request.getHostname(),
@@ -39,13 +40,13 @@ public class AgentController {
     }
 
     @PostMapping("/disconnect")
-    public ResponseEntity<Map<String, Object>> disconnect(@RequestBody AgentHeartbeatRequest request) {
+    public ResponseEntity<Map<String, Object>> disconnect(@Valid @RequestBody AgentHeartbeatRequest request) {
         agentService.disconnectAgent(request.getAgentName());
         return ResponseEntity.ok(Map.of("success", true, "message", "Agent disconnected successfully"));
     }
 
     @PostMapping("/heartbeat")
-    public ResponseEntity<Map<String, Object>> heartbeat(@RequestBody AgentHeartbeatRequest request) {
+    public ResponseEntity<Map<String, Object>> heartbeat(@Valid @RequestBody AgentHeartbeatRequest request) {
         agentService.updateHeartbeat(request.getAgentName());
         return ResponseEntity.ok(Map.of("success", true, "message", "Heartbeat received"));
     }

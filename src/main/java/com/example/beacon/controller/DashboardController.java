@@ -311,6 +311,7 @@ public class DashboardController {
                 ? e.getCreatedAt().toString().replace("T", " ").substring(0, Math.min(16, e.getCreatedAt().toString().length()))
                 : "";
         m.put("time", time);
+        m.put("source", e.getSource() != null ? e.getSource().name() : null);
         return m;
     }
 

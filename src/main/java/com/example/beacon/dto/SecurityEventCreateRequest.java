@@ -1,5 +1,6 @@
 package com.example.beacon.dto;
 
+import com.example.beacon.entity.EventSource;
 import com.example.beacon.entity.SecurityEvent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,6 +53,7 @@ public class SecurityEventCreateRequest {
                 .metadata(metadata)
                 .blocked(false)
                 .riskScore(riskScore != null ? riskScore : 0.0)
+                .source(EventSource.AGENT)
                 .build();
     }
 }

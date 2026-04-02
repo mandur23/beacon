@@ -60,7 +60,7 @@
                 <tr>
                     <th>ID</th><th>위협 유형</th><th>IP 주소</th>
                     <th>프로토콜</th><th>포트</th><th>위치</th>
-                    <th>위험도</th><th>상태</th><th>시간</th>
+                    <th>위험도</th><th>상태</th><th>시간</th><th>출처</th>
                 </tr>
             </thead>
             <tbody>
@@ -71,7 +71,8 @@
                     th:data-sev="${e.severity}" th:data-sevlabel="${e.severityLabel}"
                     th:data-sevcolor="${e.severityColor}"
                     th:data-status="${e.status}" th:data-time="${e.time}"
-                    th:data-proto="${e.protocol}" th:data-port="${e.port}">
+                    th:data-proto="${e.protocol}" th:data-port="${e.port}"
+                    th:data-source="${e.source}">
                     <td class="mono accent" th:text="${e.id}"></td>
                     <td th:text="${e.type}"></td>
                     <td class="mono dim" th:text="${e.ip}"></td>
@@ -91,6 +92,7 @@
                         </span>
                     </td>
                     <td class="muted" th:text="${e.time}"></td>
+                    <td class="muted" th:text="${e.source != null ? e.source : '-'}"></td>
                 </tr>
             </tbody>
         </table>
@@ -108,7 +110,7 @@
             <div class="detail-top" id="detailTop"></div>
             <div id="detailRows"></div>
             <div class="detail-actions">
-                <button class="btn-danger" id="blockBtn">IP 차단</button>
+                <button class="btn-danger" id="blockBtn">IP 차단 (방화벽 규칙 등록)</button>
                 <button class="btn-accent" id="investigateBtn">조사 시작</button>
             </div>
         </div>
@@ -139,9 +141,11 @@ document.querySelectorAll('.clickable-row').forEach(row => {
             <div style="font-size:14px;color:#fff;font-weight:600;margin-top:8px">${escapeHtml(d.type)}</div>
             <div style="font-size:10px;color:var(--dim);margin-top:4px">${escapeHtml(d.id)} · ${escapeHtml(d.time)}</div>
         `;
+        const sourceLabels = { SURICATA: 'Suricata (파일)', SYSLOG: 'Syslog (UDP)', AGENT: '에이전트 API', MANUAL: '수동 처리' };
         const rows = [
             ['소스 IP', d.ip], ['프로토콜', d.proto], ['포트', d.port],
             ['발원 위치', d.loc], ['처리 상태', d.status],
+            ['수집 출처', sourceLabels[d.source] || d.source || '-'],
         ];
         document.getElementById('detailRows').innerHTML = rows.map(([k,v]) =>
             `<div class="detail-row"><span class="dim">${escapeHtml(k)}</span><span class="mono">${escapeHtml(v)}</span></div>`
@@ -152,11 +156,12 @@ document.querySelectorAll('.clickable-row').forEach(row => {
 
 document.getElementById('blockBtn').addEventListener('click', () => {
     if (!currentEventDbId) return;
-    if (!confirm('해당 이벤트의 소스 IP를 차단하시겠습니까?')) return;
+    if (!confirm('해당 소스 IP를 방화벽 차단 규칙으로 등록하고 이벤트를 "차단됨" 처리합니다.\n계속하시겠습니까?')) return;
     fetch(`/api/threats/${currentEventDbId}/block`, { method: 'POST' })
         .then(r => r.json())
         .then(data => {
-            showToast(data.message, data.success ? 'success' : 'error');
+            const type = data.success ? 'success' : 'error';
+            showToast(data.message, type);
             if (data.success) { closeDetail(); location.reload(); }
         })
         .catch(() => showToast('오류가 발생했습니다', 'error'));

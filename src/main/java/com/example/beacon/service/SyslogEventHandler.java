@@ -1,5 +1,6 @@
 package com.example.beacon.service;
 
+import com.example.beacon.entity.EventSource;
 import com.example.beacon.entity.SecurityEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,7 +50,7 @@ public class SyslogEventHandler {
                 return;
             }
 
-            SecurityEvent event = suricataEventMapper.mapToSecurityEvent(root, json);
+            SecurityEvent event = suricataEventMapper.mapToSecurityEvent(root, json, EventSource.SYSLOG);
             securityEventService.createEvent(event);
             log.info("[Syslog] SecurityEvent 저장 완료 - type={}, src={}", event.getEventType(), event.getSourceIp());
         } catch (Exception e) {

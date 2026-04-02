@@ -1,5 +1,6 @@
 package com.example.beacon.service;
 
+import com.example.beacon.entity.EventSource;
 import com.example.beacon.entity.SecurityEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ public class SuricataEventMapper {
             "stats", "flow", "netflow", "fileinfo", "packetinfo"
     );
 
-    public SecurityEvent mapToSecurityEvent(JsonNode root, String rawJson) {
+    public SecurityEvent mapToSecurityEvent(JsonNode root, String rawJson, EventSource source) {
         String eventType = textOrDefault(root, "event_type", "unknown");
         String srcIp     = textOrDefault(root, "src_ip",     "0.0.0.0");
         String destIp    = textOrDefault(root, "dest_ip",    null);
@@ -47,6 +48,7 @@ public class SuricataEventMapper {
                 .metadata(rawJson)
                 .blocked("alert".equalsIgnoreCase(eventType))
                 .riskScore(riskScore)
+                .source(source)
                 .build();
     }
 

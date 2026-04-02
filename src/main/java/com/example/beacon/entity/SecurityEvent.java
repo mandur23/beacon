@@ -72,4 +72,9 @@ public class SecurityEvent {
     @Builder.Default
     @Column(nullable = false)
     private Double riskScore = 0.0;
+
+    /** 이벤트 수집 경로 (Suricata / Syslog / 에이전트 API / 수동) */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private EventSource source;
 }

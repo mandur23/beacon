@@ -3,9 +3,9 @@ spring:
     name: beacon
 
   datasource:
-    url: jdbc:mysql://localhost:3306/beacon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: your-password-here
+    url: ${BEACON_DB_URL:jdbc:mysql://localhost:3306/beacon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${BEACON_DB_USERNAME:root}
+    password: ${BEACON_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -13,8 +13,8 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        format_sql: true
-    show-sql: true
+        format_sql: false
+    show-sql: false
 
   flyway:
     enabled: true
@@ -28,25 +28,27 @@ spring:
     suffix: .html
 
 jwt:
-  secret: your-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-beacon-security
-  expiration: 86400000
+  # 기본값 없음 — 반드시 환경변수 BEACON_JWT_SECRET 으로 주입해야 한다.
+  # 값이 없거나 32바이트 미만이면 JwtTokenProvider.validateSecret()이 시작 시 예외를 던진다.
+  secret: ${BEACON_JWT_SECRET}
+  expiration: ${BEACON_JWT_EXPIRATION:86400000}
 
 ml:
   python:
     service:
-      url: http://localhost:5000
+      url: ${ML_SERVICE_URL:http://localhost:5000}
 
 syslog:
-  port: 514
+  port: ${SYSLOG_PORT:514}
   protocol: UDP
 
 suricata:
   eve:
-    enabled: true
-    path: "C:\\Program Files\\Suricata\\log\\eve.json"
-    poll-interval-ms: 500
+    enabled: ${SURICATA_EVE_ENABLED:false}
+    path: ${SURICATA_EVE_PATH:C:\\Program Files\\Suricata\\log\\eve.json}
+    poll-interval-ms: ${SURICATA_EVE_POLL_MS:500}
 
 logging:
   level:
-    com.example.beacon: DEBUG
-    org.springframework.security: DEBUG
+    com.example.beacon: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}

@@ -42,6 +42,9 @@
                     <th>버전</th>
                     <th>상태</th>
                     <th>마지막 연결</th>
+                    <th>방화벽 rev</th>
+                    <th>방화벽 상태 시각</th>
+                    <th>소유 userId</th>
                     <th>이벤트</th>
                     <th>트래픽</th>
                     <th>작업</th>
@@ -64,7 +67,10 @@
                     th:data-lastheartbeat="${a.lastHeartbeat}"
                     th:data-registeredat="${a.registeredAt}"
                     th:data-totalevents="${a.totalEvents}"
-                    th:data-totaltrafficlogs="${a.totalTrafficLogs}">
+                    th:data-totaltrafficlogs="${a.totalTrafficLogs}"
+                    th:data-owneruserid="${a.ownerUserId}"
+                    th:data-lastfirewallrevision="${a.lastFirewallAppliedRevision}"
+                    th:data-lastfirewallstatusat="${a.lastFirewallStatusAt}">
                     <td class="mono accent" th:text="${a.id}"></td>
                     <td style="font-weight:600" th:text="${a.agentName}"></td>
                     <td class="dim" th:text="${a.hostname}"></td>
@@ -87,6 +93,9 @@
                         </span>
                     </td>
                     <td class="muted" style="font-size:10px" th:text="${a.lastHeartbeat}"></td>
+                    <td class="mono dim" style="font-size:10px" th:text="${a.lastFirewallAppliedRevision != null ? a.lastFirewallAppliedRevision : '—'}"></td>
+                    <td class="muted" style="font-size:10px" th:text="${a.lastFirewallStatusAt}"></td>
+                    <td class="mono dim" style="font-size:10px" th:text="${a.ownerUserId != null ? a.ownerUserId : '—'}"></td>
                     <td class="accent" th:text="${a.totalEvents}"></td>
                     <td class="accent" th:text="${a.totalTrafficLogs}"></td>
                     <td>
@@ -94,7 +103,7 @@
                     </td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(agents)}">
-                    <td colspan="12" style="text-align:center;padding:40px;color:#6b7280">
+                    <td colspan="15" style="text-align:center;padding:40px;color:#6b7280">
                         등록된 에이전트가 없습니다<br/>
                         <small class="muted">BeaconGuardian을 실행하면 자동으로 등록됩니다</small>
                     </td>
@@ -144,6 +153,9 @@ function showAgentDetail(dbId) {
         <div class="detail-row"><span class="dim">에이전트 버전</span><span class="mono">${d.agentversion}</span></div>
         <div class="detail-row"><span class="dim">등록일시</span><span>${d.registeredat}</span></div>
         <div class="detail-row"><span class="dim">마지막 연결</span><span>${d.lastheartbeat}</span></div>
+        <div class="detail-row"><span class="dim">소유 userId</span><span class="mono">${d.owneruserid || '—'}</span></div>
+        <div class="detail-row"><span class="dim">방화벽 적용 revision</span><span class="mono">${d.lastfirewallrevision || '—'}</span></div>
+        <div class="detail-row"><span class="dim">방화벽 상태 보고 시각</span><span>${d.lastfirewallstatusat || '—'}</span></div>
         <div class="detail-row"><span class="dim">총 이벤트</span><span class="accent">${d.totalevents}건</span></div>
         <div class="detail-row"><span class="dim">총 트래픽 로그</span><span class="accent">${d.totaltrafficlogs}건</span></div>
         
@@ -152,7 +164,7 @@ function showAgentDetail(dbId) {
             ${d.status === 'offline' ? '<button class="btn-sm dim" disabled>오프라인 상태</button>' : ''}
         </div>
         
-        ${d.status === 'offline' ? '<div class="alert alert-warn" style="margin-top:12px">⚠ 에이전트가 5분 이상 응답하지 않습니다</div>' : ''}
+        ${d.status === 'offline' ? '<div class="alert alert-warn" style="margin-top:12px">⚠ 에이전트가 1분 이상 응답하지 않습니다</div>' : ''}
     `;
     
     document.getElementById('detailPanel').scrollIntoView({behavior:'smooth'});

@@ -427,6 +427,12 @@ public class DashboardController {
         m.put("registeredAt", registeredAt);
         m.put("totalEvents", a.getTotalEvents());
         m.put("totalTrafficLogs", a.getTotalTrafficLogs());
+        m.put("ownerUserId", a.getOwnerUserId());
+        m.put("lastFirewallAppliedRevision", a.getLastFirewallAppliedRevision());
+        String fwAt = a.getLastFirewallStatusAt() != null
+                ? a.getLastFirewallStatusAt().format(formatter)
+                : "—";
+        m.put("lastFirewallStatusAt", fwAt);
         
         return m;
     }

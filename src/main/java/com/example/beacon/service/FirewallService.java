@@ -21,6 +21,8 @@ import java.util.Map;
 public class FirewallService {
 
     private final FirewallRuleRepository firewallRuleRepository;
+    private final FirewallRevisionService firewallRevisionService;
+    private final FirewallCommandEnqueueService firewallCommandEnqueueService;
 
     @Transactional(readOnly = true)
     public List<FirewallRule> getAllRulesOrdered() {
@@ -45,7 +47,10 @@ public class FirewallService {
         FirewallRule rule = firewallRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("FirewallRule", id));
         rule.setEnabled(!rule.getEnabled());
-        return firewallRuleRepository.save(rule);
+        FirewallRule saved = firewallRuleRepository.save(rule);
+        long rev = firewallRevisionService.bumpRevision();
+        firewallCommandEnqueueService.enqueueUpsertRule(rev, saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -62,7 +67,10 @@ public class FirewallService {
                 .hits(0L)
                 .description(req.getDescription())
                 .build();
-        return firewallRuleRepository.save(rule);
+        FirewallRule saved = firewallRuleRepository.save(rule);
+        long rev = firewallRevisionService.bumpRevision();
+        firewallCommandEnqueueService.enqueueUpsertRule(rev, saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -78,14 +86,20 @@ public class FirewallService {
         if (req.getDescription() != null) {
             rule.setDescription(req.getDescription());
         }
-        return firewallRuleRepository.save(rule);
+        FirewallRule saved = firewallRuleRepository.save(rule);
+        long rev = firewallRevisionService.bumpRevision();
+        firewallCommandEnqueueService.enqueueUpsertRule(rev, saved.getId());
+        return saved;
     }
 
     @Transactional
     public void deleteRule(Long id) {
         FirewallRule rule = firewallRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("FirewallRule", id));
+        long ruleId = rule.getId();
         firewallRuleRepository.delete(rule);
+        long rev = firewallRevisionService.bumpRevision();
+        firewallCommandEnqueueService.enqueueDeleteRule(rev, ruleId);
     }
 
     /**
@@ -113,7 +127,7 @@ public class FirewallService {
             throw new IllegalArgumentException("ip must not be blank");
         }
 
-        // 1차 조회: 이미 활성 block 규칙이 있으면 바로 반환
+        // 1차 조회: 이미 활성 block 규칙이 있으면 바로 반환 (리비전·B 명령 없음)
         return firewallRuleRepository
                 .findFirstBySourceAddressAndActionAndEnabledTrue(ip, "block")
                 .orElseGet(() -> {
@@ -131,6 +145,8 @@ public class FirewallService {
                             .build();
                     try {
                         FirewallRule saved = firewallRuleRepository.save(rule);
+                        long rev = firewallRevisionService.bumpRevision();
+                        firewallCommandEnqueueService.enqueueUpsertRule(rev, saved.getId());
                         log.info("[Firewall] 자동 차단 규칙 생성 - ip={}, createdBy={}", ip, createdBy);
                         return saved;
                     } catch (DataIntegrityViolationException e) {

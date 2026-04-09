@@ -7,6 +7,10 @@ spring:
     username: ${BEACON_DB_USERNAME:root}
     password: ${BEACON_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      data-source-properties:
+        # MySQL: JDBC 배치(INSERT 다건) 병합. saveAll + batch_size와 함께 쓰면 N회 왕복을 줄인다.
+        rewriteBatchedStatements: true
 
   jpa:
     hibernate:
@@ -14,6 +18,10 @@ spring:
     properties:
       hibernate:
         format_sql: false
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
     show-sql: false
 
   flyway:
@@ -52,3 +60,14 @@ logging:
   level:
     com.example.beacon: ${LOG_LEVEL_APP:INFO}
     org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}
+
+# 방화벽 B채널(명령 큐)·롱폴
+beacon:
+  firewall:
+    # DUAL: A 스냅샷 + B 푸시 큐 | PULL_ONLY: B 큐 적재 생략(에이전트는 주기 A만으로 정합 가능)
+    channel-mode: ${BEACON_FIREWALL_CHANNEL_MODE:DUAL}
+    command-retention-days: ${BEACON_FIREWALL_CMD_RETENTION_DAYS:14}
+    long-poll:
+      core-pool-size: ${BEACON_FIREWALL_LP_CORE:16}
+      max-pool-size: ${BEACON_FIREWALL_LP_MAX:64}
+      queue-capacity: ${BEACON_FIREWALL_LP_QUEUE:500}

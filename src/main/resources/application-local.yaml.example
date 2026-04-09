@@ -1,0 +1,31 @@
+# 이 파일을 application-local.yaml 로 복사한 뒤 실제 값으로 채워 주세요.
+# application-local.yaml 은 .gitignore 에 의해 버전 관리에서 제외됩니다.
+#
+# 실행 방법 (IntelliJ):
+#   Run Configuration > Environment variables > SPRING_PROFILES_ACTIVE=local
+#   또는 VM options: -Dspring.profiles.active=local
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/beacon?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: YOUR_DB_PASSWORD_HERE
+
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  # openssl rand -base64 48 으로 생성 권장 (32바이트 이상)
+  secret: YOUR_256BIT_OR_LONGER_JWT_SECRET_HERE
+
+suricata:
+  eve:
+    enabled: false
+
+logging:
+  level:
+    com.example.beacon: DEBUG
+    org.springframework.security: DEBUG

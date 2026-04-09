@@ -1,7 +1,11 @@
 package com.example.beacon.service;
 
+import com.example.beacon.dto.firewall.FirewallStatusReportRequest;
 import com.example.beacon.entity.Agent;
+import com.example.beacon.exception.ResourceNotFoundException;
 import com.example.beacon.repository.AgentRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,8 +22,9 @@ import java.util.Optional;
 public class AgentService {
     
     private final AgentRepository agentRepository;
+    private final ObjectMapper objectMapper;
     
-    private static final int HEARTBEAT_TIMEOUT_MINUTES = 5;
+    private static final int HEARTBEAT_TIMEOUT_MINUTES = 1;
     
     @Transactional
     public Agent registerOrUpdateAgent(String agentName, String hostname, String ipAddress,
@@ -151,5 +156,25 @@ public class AgentService {
     @Transactional
     public void deleteAgent(Long agentId) {
         agentRepository.deleteById(agentId);
+    }
+
+    @Transactional
+    public void setOwnerUser(Long agentId, Long ownerUserId) {
+        Agent agent = agentRepository.findById(agentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", agentId));
+        agent.setOwnerUserId(ownerUserId);
+        agentRepository.save(agent);
+    }
+
+    @Transactional
+    public void recordFirewallStatus(Agent agent, FirewallStatusReportRequest request) {
+        agent.setLastFirewallAppliedRevision(request.getLastAppliedRevision());
+        agent.setLastFirewallStatusAt(LocalDateTime.now());
+        try {
+            agent.setFirewallStatusJson(objectMapper.writeValueAsString(request));
+        } catch (JsonProcessingException e) {
+            agent.setFirewallStatusJson("{\"error\":\"serialize\"}");
+        }
+        agentRepository.save(agent);
     }
 }

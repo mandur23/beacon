@@ -2,11 +2,14 @@ package com.example.beacon;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
+import com.example.beacon.config.BeaconFirewallProperties;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
+@EnableConfigurationProperties(BeaconFirewallProperties.class)
 public class BeaconApplication {
 
     public static void main(String[] args) {

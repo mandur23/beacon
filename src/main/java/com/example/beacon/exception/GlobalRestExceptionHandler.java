@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -69,6 +70,19 @@ public class GlobalRestExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
             IllegalArgumentException ex, HttpServletRequest req) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
+
+    /** Spring ResponseStatusException (403/404 등) */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiErrorResponse> handleResponseStatus(
+            ResponseStatusException ex, HttpServletRequest req) {
+        int code = ex.getStatusCode().value();
+        HttpStatus status = HttpStatus.resolve(code);
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        String msg = ex.getReason() != null ? ex.getReason() : status.getReasonPhrase();
+        return build(status, msg, req);
     }
 
     /** 그 외 미처리 예외 → 500 (내부 메시지는 로그에만 기록) */

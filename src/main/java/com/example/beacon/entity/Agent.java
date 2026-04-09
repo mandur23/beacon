@@ -69,4 +69,18 @@ public class Agent {
     
     @Column
     private Long totalTrafficLogs = 0L;  // 전송한 총 트래픽 로그 수
+
+    /** JWT 사용자와 매핑 시 /api/agents/me/* 에서 소유 검증에 사용 */
+    @Column(name = "owner_user_id")
+    private Long ownerUserId;
+
+    @Column(name = "last_firewall_applied_revision")
+    private Long lastFirewallAppliedRevision;
+
+    @Column(name = "last_firewall_status_at")
+    private LocalDateTime lastFirewallStatusAt;
+
+    /** 마지막 POST firewall-status 본문 요약(JSON) */
+    @Column(name = "firewall_status_json", columnDefinition = "TEXT")
+    private String firewallStatusJson;
 }

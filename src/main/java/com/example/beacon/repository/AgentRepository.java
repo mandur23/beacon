@@ -55,4 +55,6 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Modifying
     @Query("UPDATE Agent a SET a.status = 'offline' WHERE a.status = 'online' AND a.lastHeartbeat < :threshold")
     int bulkMarkOffline(@Param("threshold") LocalDateTime threshold);
+
+    List<Agent> findByOwnerUserId(Long ownerUserId);
 }

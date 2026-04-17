@@ -16,6 +16,8 @@ public interface TrafficLogRepository extends JpaRepository<TrafficLog, Long> {
     
     Page<TrafficLog> findByIsAnomaly(Boolean isAnomaly, Pageable pageable);
     
+    Page<TrafficLog> findByAgentName(String agentName, Pageable pageable);
+    
     List<TrafficLog> findBySourceIp(String sourceIp);
     
     @Query("SELECT t FROM TrafficLog t WHERE t.timestamp BETWEEN :startDate AND :endDate")
@@ -34,4 +36,10 @@ public interface TrafficLogRepository extends JpaRepository<TrafficLog, Long> {
     /** 기간 내 평균 연결 지속 시간 (ms) */
     @Query("SELECT AVG(t.duration) FROM TrafficLog t WHERE t.timestamp > :since")
     Double averageDurationSince(@Param("since") LocalDateTime since);
+
+    /** 특정 에이전트의 프로세스별 트래픽 점유율 (최근 1시간) */
+    @Query(value = "SELECT JSON_EXTRACT(raw_data, '$.process_name') as processName, SUM(bytes_transferred) as totalBytes " +
+           "FROM traffic_logs WHERE timestamp > :since AND agent_name = :agentName " +
+           "GROUP BY processName ORDER BY totalBytes DESC", nativeQuery = true)
+    List<Object[]> getProcessTrafficStats(@Param("agentName") String agentName, @Param("since") LocalDateTime since);
 }

@@ -5,87 +5,138 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title th:text="${pageTitle} + ' · Beacon'">Beacon</title>
+    <title th:text="${pageTitle} + ' | 비콘'">비콘</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <link rel="stylesheet" th:href="@{/css/main.css}"/>
 </head>
 <body>
+<div id="toast-container"></div>
+<div class="app-shell-glow"></div>
 
 <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo" onclick="toggleSidebar()">
-        <div class="logo-icon">🛡</div>
+    <a th:href="@{/dashboard}" class="sidebar-head beacon-brand">
+        <div class="logo-icon"><i data-lucide="shield-check" color="#00f2ff"></i></div>
         <div class="logo-text">
-            <div class="logo-title">BEACON</div>
-            <div class="logo-sub">ADMIN CONSOLE</div>
+            <h1 class="logo-title">BEACON</h1>
+            <p class="logo-sub">통합 보안 관제 플랫폼</p>
+        </div>
+    </a>
+
+    <div class="sidebar-section">
+        <div class="sidebar-section-label">운영 상태</div>
+        <div class="sidebar-chip-row">
+            <span class="sidebar-chip"><i data-lucide="radar"></i> 실시간 수집</span>
+            <span class="sidebar-chip"><i data-lucide="shield"></i> 정책 동기화</span>
         </div>
     </div>
-    <div class="live-badge">
-        <span class="blink-dot">●</span>
-        LIVE MONITORING
-    </div>
-    <nav class="sidebar-nav">
-        <a th:href="@{/dashboard}" th:classappend="${page == 'dashboard'} ? ' active'" class="nav-item">
-            <span class="nav-icon">◈</span><span class="nav-label">대시보드</span>
+
+    <nav class="nav-list">
+        <a th:href="@{/dashboard}" th:classappend="${page == 'dashboard'} ? ' active'" class="nav-link">
+            <i data-lucide="layout-grid"></i><span class="nav-label">대시보드</span>
         </a>
-        <a th:href="@{/threats}" th:classappend="${page == 'threats'} ? ' active'" class="nav-item">
-            <span class="nav-icon">⚠</span><span class="nav-label">위협 / 이벤트</span>
-            <span class="nav-badge" th:if="${navBadgeCount != null and navBadgeCount > 0}" th:text="${navBadgeCount}"></span>
+        <a th:href="@{/threats}" th:classappend="${page == 'threats'} ? ' active'" class="nav-link">
+            <i data-lucide="zap"></i><span class="nav-label">위협 피드</span>
+            <span class="badge danger" th:if="${navBadgeCount != null and navBadgeCount > 0}"
+                  th:text="${navBadgeCount}" style="margin-left:auto; padding:2px 6px; font-size:10px;"></span>
         </a>
-        <a th:href="@{/network}" th:classappend="${page == 'network'} ? ' active'" class="nav-item">
-            <span class="nav-icon">⬡</span><span class="nav-label">네트워크</span>
+        <a th:href="@{/network}" th:classappend="${page == 'network'} ? ' active'" class="nav-link">
+            <i data-lucide="share-2"></i><span class="nav-label">네트워크 분석</span>
         </a>
-        <a th:href="@{/access}" th:classappend="${page == 'access'} ? ' active'" class="nav-item">
-            <span class="nav-icon">◎</span><span class="nav-label">접근 제어</span>
+        <a th:href="@{/agents}" th:classappend="${page == 'agents'} ? ' active'" class="nav-link">
+            <i data-lucide="server"></i><span class="nav-label">에이전트 관리</span>
         </a>
-        <a th:href="@{/agents}" th:classappend="${page == 'agents'} ? ' active'" class="nav-item">
-            <span class="nav-icon">◫</span><span class="nav-label">에이전트</span>
+        <a th:href="@{/firewall}" th:classappend="${page == 'firewall'} ? ' active'" class="nav-link">
+            <i data-lucide="shield"></i><span class="nav-label">방화벽 제어</span>
         </a>
-        <a th:href="@{/firewall}" th:classappend="${page == 'firewall'} ? ' active'" class="nav-item">
-            <span class="nav-icon">⊞</span><span class="nav-label">방화벽 / 정책</span>
+        <a th:href="@{/reports}" th:classappend="${page == 'reports'} ? ' active'" class="nav-link">
+            <i data-lucide="pie-chart"></i><span class="nav-label">보고서</span>
         </a>
-        <a th:href="@{/policies/event-blocking}" th:classappend="${page == 'event-blocking'} ? ' active'" class="nav-item">
-            <span class="nav-icon">⛶</span><span class="nav-label">이벤트 차단 정책</span>
+        <a th:href="@{/access}" th:classappend="${page == 'access'} ? ' active'" class="nav-link">
+            <i data-lucide="key"></i><span class="nav-label">접근 제어</span>
         </a>
-        <a th:href="@{/reports}" th:classappend="${page == 'reports'} ? ' active'" class="nav-item">
-            <span class="nav-icon">◧</span><span class="nav-label">보고서 / 분석</span>
+        <a th:href="@{/location}" th:classappend="${page == 'location'} ? ' active'" class="nav-link">
+            <i data-lucide="map-pin"></i><span class="nav-label">위치 추적</span>
         </a>
     </nav>
-    <div class="sidebar-sys">
-        <div class="sys-title">SYSTEM</div>
-        <div class="sys-row"><span>CPU</span><span class="sys-val accent" id="sysCpu">--</span></div>
-        <div class="sys-bar"><div class="sys-bar-fill accent" id="sysCpuBar" style="width:0%"></div></div>
-        <div class="sys-row"><span>MEM</span><span class="sys-val yellow" id="sysMem">--</span></div>
-        <div class="sys-bar"><div class="sys-bar-fill yellow" id="sysMemBar" style="width:0%"></div></div>
-        <div class="sys-row"><span>NET</span><span class="sys-val green" id="sysNet">--</span></div>
-        <div class="sys-bar"><div class="sys-bar-fill green" id="sysNetBar" style="width:0%"></div></div>
+
+    <div class="system-status">
+        <div class="status-block">
+            <div class="status-label-row">
+                <span>시스템 상태</span>
+                <span class="success">센서 정상 동작</span>
+            </div>
+            <div class="status-meter">
+                <div id="sysCpuBar" class="status-meter-bar" style="width: 45%;"></div>
+            </div>
+        </div>
+        <div class="status-grid">
+            <div>
+                <div class="status-mini-label">운영 모드</div>
+                <div class="status-mini-value">실시간 방어</div>
+            </div>
+            <div>
+                <div class="status-mini-label">통신 채널</div>
+                <div class="status-mini-value">보안 TLS</div>
+            </div>
+        </div>
     </div>
 </aside>
 
-<div class="main-wrap" id="mainWrap">
-    <header class="top-header">
-        <div>
-            <h1 class="header-title" th:text="${pageTitle}">대시보드</h1>
-            <p class="header-sub">
-                <span id="headerDate"></span>
-                <span class="accent" id="headerTime"></span>
-                &nbsp;· KST
-            </p>
-        </div>
-        <div class="header-right">
-            <div class="threat-badge">
-                <span class="ping-dot"></span>
-                위협 감지 활성
+<div class="main-container" id="mainWrap">
+    <header class="main-header">
+        <div class="header-left">
+            <button class="icon-btn" onclick="toggleSidebar()"><i data-lucide="menu"></i></button>
+            <div>
+                <div class="eyebrow">보안 관제</div>
+                <div class="header-page-title" th:text="${pageTitle}">Dashboard</div>
             </div>
-            <form th:action="@{/logout}" method="post" style="margin:0">
-                <button type="submit" class="btn-icon" title="로그아웃">⏻</button>
-            </form>
-            <div class="avatar">관</div>
+        </div>
+
+        <div class="header-right">
+            <div class="header-status-pill">
+                <span class="live-dot"></span>
+                <span>실시간 모니터링 중</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); font-family:var(--font-mono);">
+                <i data-lucide="clock" size="14"></i>
+                <span id="headerDate"></span>
+                <span id="headerTime" class="accent"></span>
+            </div>
+            <div style="width:1px; height:20px; background:var(--glass-border);"></div>
+            <div class="operator-box">
+                <div class="operator-avatar">AD</div>
+                <div class="operator-meta">
+                    <strong>관리자</strong>
+                    <span>관제 세션</span>
+                </div>
+                <form th:action="@{/logout}" method="post">
+                    <button type="submit" class="icon-btn" style="color:var(--danger);"><i data-lucide="log-out" size="18"></i></button>
+                </form>
+            </div>
         </div>
     </header>
-    <main class="content">
+
+    <main class="main-content">
         <th:block th:replace="${content}"/>
     </main>
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    });
+
+    const toggleSidebar = () => {
+        const sb = document.getElementById('sidebar');
+        if (sb) sb.classList.toggle('collapsed');
+    };
+</script>
 <script th:src="@{/js/main.js}"></script>
 </body>
 </html>

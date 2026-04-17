@@ -47,7 +47,7 @@ public class AgentController {
 
     @PostMapping("/heartbeat")
     public ResponseEntity<Map<String, Object>> heartbeat(@Valid @RequestBody AgentHeartbeatRequest request) {
-        agentService.updateHeartbeat(request.getAgentName());
+        agentService.updateHeartbeat(request.getAgentName(), request.getMetadata());
         return ResponseEntity.ok(Map.of("success", true, "message", "Heartbeat received"));
     }
     

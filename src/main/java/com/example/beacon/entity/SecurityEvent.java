@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "security_events", indexes = {
     @Index(name = "idx_severity", columnList = "severity"),
     @Index(name = "idx_created_at", columnList = "createdAt"),
-    @Index(name = "idx_source_ip", columnList = "sourceIp")
+    @Index(name = "idx_source_ip", columnList = "sourceIp"),
+    @Index(name = "idx_agent_name", columnList = "agentName")
 })
 @Data
 @NoArgsConstructor
@@ -27,6 +28,9 @@ public class SecurityEvent {
     
     @Column(nullable = false, length = 100)
     private String eventType;
+    
+    @Column(length = 100)
+    private String agentName;
     
     @Column(nullable = false, length = 20)
     private String severity;
@@ -52,7 +56,7 @@ public class SecurityEvent {
     @Column(columnDefinition = "TEXT")
     private String description;
     
-    @Column(columnDefinition = "JSON")
+    @Column(columnDefinition = "LONGTEXT")
     private String metadata;
     
     @CreationTimestamp

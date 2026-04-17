@@ -176,7 +176,7 @@ public class SecurityEventService {
         return securityEventRepository.findWithFilters(severity, search);
     }
 
-    /** 지정한 날짜(자정~다음날 자정) 구간의 이벤트만 조회 */
+    /** 지정한 날짜(자정~다음날 자정) 구간의 이벤트만 페이징 조회 */
     @Transactional(readOnly = true)
     public List<SecurityEvent> getEventsWithFiltersForDate(String severity, String search, LocalDate date) {
         LocalDateTime start = date.atStartOfDay();
@@ -184,13 +184,25 @@ public class SecurityEventService {
         return securityEventRepository.findWithFiltersAndDateRange(severity, search, start, end);
     }
 
-    /** 해당 날짜의 severity별 건수 (위협 페이지 필터 카드용) */
+    /** 고급 필터와 페이지네이션을 지원하는 조회 (date가 null이면 날짜 필터 무시) */
+    @Transactional(readOnly = true)
+    public Page<SecurityEvent> getEventsWithFiltersPaged(String severity, String search,
+                                                         String agentName, String source,
+                                                         boolean riskOnly, LocalDate date,
+                                                         Pageable pageable) {
+        LocalDateTime start = date != null ? date.atStartOfDay() : null;
+        LocalDateTime end = date != null ? date.plusDays(1).atStartOfDay() : null;
+        return securityEventRepository.findWithAdvancedFilters(
+                severity, search, agentName, source, riskOnly, start, end, pageable);
+    }
+
+    /** 지정한 날짜 구간의 severity별 건수 (date가 null이면 전체 통계) */
     @Transactional(readOnly = true)
     public Map<String, Long> getSeverityCountsForDate(LocalDate date) {
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        LocalDateTime start = date != null ? date.atStartOfDay() : null;
+        LocalDateTime end = date != null ? date.plusDays(1).atStartOfDay() : null;
         List<Object[]> results = securityEventRepository.countBySeverityInDateRange(start, end);
-        Map<String, Long> counts = new HashMap<>();
+        Map<String, Long> counts = new java.util.HashMap<>();
         for (Object[] result : results) {
             counts.put((String) result[0], (Long) result[1]);
         }

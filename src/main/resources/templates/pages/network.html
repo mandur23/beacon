@@ -4,329 +4,620 @@
 <body>
 <content>
 
-<!-- 메트릭 카드 -->
-<div class="grid-4 mb16">
-    <div th:each="m : ${metrics}" class="card" style="padding:16px 20px">
-        <div class="stat-label mb8" th:text="${m.label}"></div>
-        <div class="stat-value mb10" th:text="${m.value}"
-             th:style="'color:' + ${m.color}"></div>
-        <div class="progress-bar">
-            <div class="progress-fill"
-                 th:style="'width:' + ${m.pct} + '%;background:' + ${m.color}"></div>
+<!-- Section 1: Network Core Metrics -->
+<div class="grid-metrics mb24">
+    <div th:each="m : ${metrics}" class="premium-glass kpi-box" th:style="'--metric-color:' + ${m.color}">
+        <div class="metric-header">
+            <span class="metric-label" th:text="${m.label}">LABEL</span>
+            <i data-lucide="activity" class="pulse-alive" th:style="'color:' + ${m.color}"></i>
+        </div>
+        <div class="metric-val glow-text" th:text="${m.value}">0</div>
+        <div class="progress-container">
+            <div class="progress-bar" th:style="'width:' + ${m.pct} + '%; background:' + ${m.color}"></div>
         </div>
     </div>
 </div>
 
-<!-- 탭 -->
-<div class="tab-bar mb16">
-    <a th:href="@{/network(tab='topology')}"
-       th:classappend="${tab == 'topology'} ? ' active'" class="tab-btn">네트워크 토폴로지</a>
-    <a th:href="@{/network(tab='interfaces')}"
-       th:classappend="${tab == 'interfaces'} ? ' active'" class="tab-btn">인터페이스</a>
-    <a th:href="@{/network(tab='traffic')}"
-       th:classappend="${tab == 'traffic'} ? ' active'" class="tab-btn">트래픽 분석</a>
+<!-- Section 2: Tabbed Control Center -->
+<div class="segmented-nav mb24">
+    <a th:href="@{/network(tab='topology')}" th:class="'nav-item ' + (${tab == 'topology'} ? 'active' : '')">
+        <i data-lucide="share-2"></i> 인프라 토폴로지
+    </a>
+    <a th:href="@{/network(tab='traffic')}" th:class="'nav-item ' + (${tab == 'traffic'} ? 'active' : '')">
+        <i data-lucide="zap"></i> 트래픽 분석 (Real-time)
+    </a>
+    <a th:href="@{/network(tab='interfaces')}" th:class="'nav-item ' + (${tab == 'interfaces'} ? 'active' : '')">
+        <i data-lucide="layers"></i> 하드웨어 인터페이스
+    </a>
 </div>
 
-<!-- 토폴로지 -->
+<!-- Tab Content: Infrastructure Topology -->
 <th:block th:if="${tab == 'topology'}">
-<div class="grid-12">
-    <div class="card span-8">
-        <div class="card-header">
-            <div class="card-title">네트워크 토폴로지</div>
-            <div style="display:flex;align-items:center;gap:8px">
-                <span id="topoStatus" class="tag" style="color:#ffd166;background:#ffd16618;border-color:#ffd16644;font-size:11px">연결 중...</span>
-                <span class="card-sub">실시간 네트워크 구성도</span>
+    <div class="network-main-layout topology-view">
+        <!-- Topology Map (Resized for better UX) -->
+        <div class="premium-glass topology-container" style="height: 480px; position:relative; overflow:hidden;">
+            <div class="card-header" style="z-index: 10; position: relative;">
+                <div>
+                    <div class="card-title glow-text" style="font-size:16px;">Infra Topology Mapping (Vis.js Interactive)</div>
+                    <div class="card-sub">실시간 동적 노드 연결도 및 통신 시각화 그래프</div>
+                </div>
+                <div class="topology-legend">
+                    <span class="legend-item"><i class="dot ok"></i> Stable</span>
+                    <span class="legend-item"><i class="dot warn"></i> Alert</span>
+                </div>
             </div>
+            <!-- Vis.js DOM 컨테이너 -->
+            <div id="visNetworkContainer" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
         </div>
-        <div style="padding:12px 16px">
-            <svg id="topoSvg" width="100%" height="280" viewBox="0 0 100 100"></svg>
-            <div class="legend" style="justify-content:center;margin-top:8px;flex-wrap:wrap;gap:4px">
-                <span class="legend-item red">● 방화벽</span>
-                <span class="legend-item accent">● 영역</span>
-                <span class="legend-item green">● 서버</span>
-                <span class="legend-item yellow">● 센서</span>
-                <span style="color:#a78bfa;font-size:12px">● 에이전트</span>
-                <span style="margin-left:8px;font-size:11px;color:#4a5570">
-                    정상 <span id="topoOk" style="color:#06d6a0">-</span>
-                    경고 <span id="topoWarn" style="color:#ffd166">-</span>
-                    오류 <span id="topoErr" style="color:#ff3d5a">-</span>
-                    · 온라인 에이전트 <span id="topoAgentOnline" style="color:#a78bfa">0</span>/<span id="topoAgentTotal" style="color:#4a5570">0</span>
-                </span>
+
+        <!-- Node Inspector -->
+        <div class="premium-glass node-inspector-side" style="height: 480px;">
+            <div class="card-header">
+                <div class="card-title" style="font-size:14px;">Node Intelligence</div>
+            </div>
+            <div id="nodeDetailsList" class="scroll-body">
+                <div th:each="n : ${nodes}" class="node-status-card" th:data-id="${n.id}" onclick="focusNode(this.getAttribute('data-id'))">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="fw-800" style="color:#fff; font-size:13px;" th:text="${n.label}">Node</span>
+                        <i data-lucide="circle" th:class="${n.status == 'ok' ? 'success' : 'warning'}" size="8"></i>
+                    </div>
+                    <div class="dim mono" style="font-size:10px; margin-top:4px;" th:text="${n.ip}">0.0.0.0</div>
+                </div>
+                <div th:if="${#lists.isEmpty(nodes)}" class="empty-state">
+                    <i data-lucide="server-off" size="24"></i>
+                    <p>활성화된 노드가 없습니다.</p>
+                </div>
             </div>
         </div>
     </div>
-    <div class="card span-4">
-        <div class="card-header">
-            <div class="card-title">장비 상태</div>
-            <span id="topoLastUpdate" style="font-size:10px;color:#4a5570"></span>
-        </div>
-        <div id="nodeStatusList" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
-            <div class="dim" style="font-size:12px;text-align:center;padding:16px">로딩 중...</div>
-        </div>
-    </div>
-</div>
-<script th:inline="none">
-(function() {
-    const ns = "http://www.w3.org/2000/svg";
-    const svg = document.getElementById('topoSvg');
+</th:block>
 
-    const TYPE_COLOR   = {firewall:"#ff3d5a", zone:"#00e5ff", server:"#06d6a0", sensor:"#ffd166", agent:"#a78bfa"};
-    const STATUS_COLOR = {ok:"#06d6a0", warn:"#ffd166", error:"#ff3d5a"};
-    const STATUS_LABEL = {ok:"정상", warn:"경고", error:"오류"};
-
-    // 에이전트는 크기를 작게
-    const NODE_R     = {firewall:5, zone:5, server:5, sensor:5, agent:3.5};
-    const NODE_DOT_R = {firewall:1.8, zone:1.8, server:1.8, sensor:1.8, agent:1.3};
-    const NODE_FONT  = {firewall:3.5, zone:3.5, server:3.5, sensor:3.5, agent:3};
-
-    // 폴링마다 SVG를 완전 재구성 (에이전트가 동적으로 추가/제거되므로)
-    function buildSvg(nodes, links, viewBoxH, hasAgents) {
-        svg.setAttribute('viewBox', '0 0 100 ' + viewBoxH);
-
-        // SVG 높이를 viewBoxH에 비례해서 조정
-        svg.setAttribute('height', Math.round(280 * viewBoxH / 100));
-
-        svg.innerHTML = '';
-
-        // 에이전트 구분 영역 배경 (에이전트가 있을 때만)
-        if (hasAgents) {
-            const sepBg = document.createElementNS(ns, 'rect');
-            sepBg.setAttribute('x', '0'); sepBg.setAttribute('y', '104');
-            sepBg.setAttribute('width', '100'); sepBg.setAttribute('height', viewBoxH - 104);
-            sepBg.setAttribute('fill', '#a78bfa08');
-            sepBg.setAttribute('stroke', '#a78bfa22');
-            sepBg.setAttribute('stroke-width', '0.3');
-            svg.appendChild(sepBg);
-
-            const sepLabel = document.createElementNS(ns, 'text');
-            sepLabel.setAttribute('x', '50'); sepLabel.setAttribute('y', '109');
-            sepLabel.setAttribute('text-anchor', 'middle');
-            sepLabel.setAttribute('font-size', '3');
-            sepLabel.setAttribute('fill', '#a78bfa88');
-            sepLabel.textContent = '── 온라인 에이전트 ──';
-            svg.appendChild(sepLabel);
-        }
-
-        // 링크
-        links.forEach(lk => {
-            const na = nodes.find(n => n.id === lk.from);
-            const nb = nodes.find(n => n.id === lk.to);
-            if (!na || !nb) return;
-            const isAgentLink = lk.to.startsWith('AG-');
-            const line = document.createElementNS(ns, 'line');
-            line.setAttribute('x1', na.x); line.setAttribute('y1', na.y);
-            line.setAttribute('x2', nb.x); line.setAttribute('y2', nb.y);
-            line.setAttribute('stroke', isAgentLink ? '#a78bfa33' : (lk.active ? '#2a3248' : '#1a1f30'));
-            line.setAttribute('stroke-width', isAgentLink ? '0.3' : '0.5');
-            line.setAttribute('stroke-dasharray', (!lk.active && !isAgentLink) ? '2 1' : 'none');
-            svg.appendChild(line);
-        });
-
-        // 노드
-        nodes.forEach(n => {
-            const baseColor = TYPE_COLOR[n.type] || '#4a5570';
-            const sc = n.type === 'agent' ? baseColor : (STATUS_COLOR[n.status] || baseColor);
-            const r    = NODE_R[n.type]     || 5;
-            const dotR = NODE_DOT_R[n.type] || 1.8;
-            const fs   = NODE_FONT[n.type]  || 3.5;
-
-            const g = document.createElementNS(ns, 'g');
-            g.style.cursor = 'default';
-
-            const title = document.createElementNS(ns, 'title');
-            title.textContent = n.label + ' · ' + (STATUS_LABEL[n.status] || n.status)
-                              + '\n' + n.detail;
-            g.appendChild(title);
-
-            const ring = document.createElementNS(ns, 'circle');
-            ring.setAttribute('cx', n.x); ring.setAttribute('cy', n.y); ring.setAttribute('r', r);
-            ring.setAttribute('fill', sc + '22'); ring.setAttribute('stroke', sc);
-            ring.setAttribute('stroke-width', n.type === 'agent' ? '0.5' : '0.7');
-
-            const dot = document.createElementNS(ns, 'circle');
-            dot.setAttribute('cx', n.x); dot.setAttribute('cy', n.y); dot.setAttribute('r', dotR);
-            dot.setAttribute('fill', sc);
-
-            const label = document.createElementNS(ns, 'text');
-            label.setAttribute('x', n.x); label.setAttribute('y', n.y + r + 3.5);
-            label.setAttribute('text-anchor', 'middle'); label.setAttribute('font-size', fs);
-            label.setAttribute('fill', n.type === 'agent' ? '#a78bfa99' : '#4a5570');
-            label.textContent = n.label;
-
-            g.appendChild(ring); g.appendChild(dot); g.appendChild(label);
-            svg.appendChild(g);
-        });
-    }
-
-    function updateStatusPanel(nodes) {
-        const list = document.getElementById('nodeStatusList');
-        if (!list) return;
-
-        const infra  = nodes.filter(n => n.type !== 'agent');
-        const agents = nodes.filter(n => n.type === 'agent');
-
-        let html = infra.map(n => renderRow(n)).join('');
-
-        if (agents.length > 0) {
-            html += `<div style="font-size:10px;color:#a78bfa88;margin:4px 0 2px;padding-top:4px;border-top:1px solid #a78bfa22">
-                        온라인 에이전트 (${agents.length})
-                     </div>`;
-            html += agents.map(n => renderRow(n)).join('');
-        }
-
-        list.innerHTML = html;
-    }
-
-    function renderRow(n) {
-        const sc = n.type === 'agent' ? '#a78bfa' : (STATUS_COLOR[n.status] || '#4a5570');
-        const sl = n.type === 'agent' ? '온라인' : (STATUS_LABEL[n.status] || n.status);
-        return `<div class="node-row">
-            <span class="dot" style="background:${sc}"></span>
-            <div style="flex:1;min-width:0">
-                <div class="node-label" style="${n.type==='agent'?'color:#a78bfa':''}">
-                    ${n.label}
-                </div>
-                <div class="node-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                    ${n.detail}
+<!-- Tab Content: Traffic Intelligence -->
+<th:block th:if="${tab == 'traffic'}">
+    <div class="traffic-analytics-container">
+        <!-- Center: Live Traffic Stream -->
+        <div class="premium-glass main-stream">
+            <div class="card-header">
+                <div class="card-title glow-text">Traffic Intelligence Stream (Live)</div>
+                <div class="header-actions" style="display:flex; gap:12px; align-items:center;">
+                    <select id="agentFilter" class="glass-select" onchange="fetchTrafficLogs()">
+                        <option value="">모든 에이전트</option>
+                    </select>
+                    <span id="trafficCount" class="badge">0 LOGS</span>
+                    <button class="btn-refresh" onclick="fetchTrafficLogs()"><i data-lucide="refresh-cw"></i></button>
                 </div>
             </div>
-            <span class="tag" style="color:${sc};background:${sc}18;border-color:${sc}44;white-space:nowrap">${sl}</span>
-        </div>`;
+            <div class="table-container scroll-body" style="height: 500px;">
+                <table class="p-table cyber-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Agent</th>
+                            <th>Origin → Destination</th>
+                            <th>Prot.</th>
+                            <th>Size</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trafficTableBody">
+                        <!-- Polled data will appear here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sidebar: Details & Charts -->
+        <div class="traffic-info-sidebar">
+            
+            <!-- Protocol Doughnut Chart -->
+            <div class="premium-glass mb24" style="padding:16px;">
+                <div class="card-header">
+                    <div class="card-title glow-text" style="font-size:13px;">Protocol Distribution</div>
+                </div>
+                <div style="height: 180px;">
+                    <canvas id="protocolChartCanvas"></canvas>
+                </div>
+            </div>
+
+            <!-- New: Top Applications (2번 기능) -->
+            <div class="premium-glass mb24">
+                <div class="card-header">
+                    <div class="card-title glow-text" style="font-size:13px;">Top Applications (1h)</div>
+                </div>
+                <div id="processStatsWidget" class="scroll-body" style="padding:16px;">
+                    <div class="spinner-sm"></div>
+                </div>
+            </div>
+
+            <!-- Deep Inspector -->
+            <div class="premium-glass inspector-panel">
+                <div class="card-header">
+                    <div class="card-title">Flow Inspector</div>
+                    <i data-lucide="binary" class="dim"></i>
+                </div>
+                <div id="trafficDetails" class="inspector-content scroll-body">
+                    <div class="empty-state" style="padding:20px;">
+                        <p style="font-size:11px;">데이터를 보려면 항목을 클릭하세요.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Tab Content: Interfaces -->
+<th:block th:if="${tab == 'interfaces'}">
+    <div style="display:flex; flex-direction:column; gap:24px;">
+        
+        <!-- 에이전트별 NIC 정보를 개별 카드형태로 그룹화해서 출력 -->
+        <div th:each="ai : ${agentInterfaces}" class="premium-glass">
+            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 16px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <i data-lucide="monitor" class="accent"></i>
+                    <div>
+                        <div class="card-title glow-text" style="font-size:18px;" th:text="${ai.name}">Agent Name</div>
+                        <div class="card-sub" th:text="${ai.ip + ' | Traffic Logs: ' + ai.trafficCount}">IP | Traffic</div>
+                    </div>
+                </div>
+                <div>
+                    <span class="badge" th:classappend="${ai.status == 'online' ? 'success' : 'danger'}" th:text="${ai.status.toUpperCase()}">OFFLINE</span>
+                </div>
+            </div>
+            
+            <div class="table-container" style="padding-top: 8px;">
+                <table class="p-table cyber-table">
+                    <thead>
+                        <tr>
+                            <th>NIC Name</th>
+                            <th>IPv4 Address</th>
+                            <th>TX (Sent)</th>
+                            <th>RX (Received)</th>
+                            <th>Speed</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Agent의 하드웨어 물리 NIC 출력 -->
+                        <tr th:each="nic : ${ai.hwInterfaces}">
+                            <td class="mono accent fw-800" th:text="${nic.name}">eth0</td>
+                            <td class="mono dim" th:text="${nic.ip}">-</td>
+                            <td class="mono danger" th:text="${nic.tx} + ' B'">0</td>
+                            <td class="mono success" th:text="${nic.rx} + ' B'">0</td>
+                            <td class="dim" th:text="${nic.speed} + ' Mbps'">-</td>
+                            <td>
+                                <span class="badge" th:classappend="${nic.isup ? 'success' : 'dim'}" th:text="${nic.isup ? 'UP' : 'DOWN'}"></span>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(ai.hwInterfaces)}">
+                            <td colspan="6" style="text-align:center; padding:20px; color:rgba(255,255,255,0.3);">수집된 네트워크 인터페이스 정보가 없습니다. (에이전트 데몬 구동상태 확인 필요)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div th:if="${#lists.isEmpty(agentInterfaces)}" class="empty-state">
+            <i data-lucide="server-off" size="32"></i>
+            <p>연결된 에이전트가 존재하지 않습니다.</p>
+        </div>
+
+    </div>
+</th:block>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script th:inline="javascript">
+/*<![CDATA[*/
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Vis.js 기반 다이나믹 토폴로지 렌더링
+    const visContainer = document.getElementById('visNetworkContainer');
+    const nodesData = /*[[${nodes}]]*/ [];
+    
+    if (visContainer && typeof vis !== 'undefined') {
+        const visNodes = [];
+        const visEdges = [];
+
+        // Core Server (Center)
+        visNodes.push({ 
+            id: 'core', 
+            label: 'Core Server\n(Beacon)', 
+            shape: 'hexagon', 
+            color: { background: 'rgba(0, 242, 255, 0.1)', border: '#00f2ff' }, 
+            font: { color: '#fff', size: 14 } 
+        });
+
+        nodesData.forEach((n) => {
+            const isOk = n.status === 'ok';
+            visNodes.push({
+                id: n.id,
+                label: n.label + '\n' + (n.ip || ''),
+                shape: 'dot',
+                size: 16,
+                color: {
+                    background: isOk ? 'rgba(6, 214, 160, 0.2)' : 'rgba(255, 61, 90, 0.2)',
+                    border: isOk ? '#06d6a0' : '#ff3d5a',
+                    highlight: { background: 'rgba(255,255,255,0.4)', border: '#fff' }
+                },
+                font: { color: '#ddd', size: 11 }
+            });
+
+            // Edge (Connect to Core)
+            visEdges.push({
+                from: 'core', to: n.id,
+                color: { color: 'rgba(255, 255, 255, 0.1)', highlight: '#00f2ff' },
+                dashes: !isOk
+            });
+        });
+
+        const data = { nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges) };
+        const options = {
+            nodes: { borderWidth: 2, shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 10, x:2, y:2 } },
+            edges: { width: 2, smooth: { type: 'continuous' } },
+            physics: {
+                forceAtlas2Based: { gravitationalConstant: -50, centralGravity: 0.01, springLength: 100, springConstant: 0.08 },
+                minVelocity: 0.75,
+                solver: 'forceAtlas2Based'
+            },
+            interaction: { hover: true, tooltipDelay: 200 }
+        };
+        new vis.Network(visContainer, data, options);
     }
 
-    function updateSummary(summary) {
-        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '-'; };
-        set('topoOk',          summary.ok);
-        set('topoWarn',        summary.warn);
-        set('topoErr',         summary.error);
-        set('topoAgentOnline', summary.agentOnline ?? 0);
-        set('topoAgentTotal',  summary.agentTotal  ?? 0);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 
-        const statusEl = document.getElementById('topoStatus');
-        if (statusEl) {
-            if ((summary.error ?? 0) > 0) {
-                statusEl.textContent = '오류 감지';
-                statusEl.style.cssText = 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44;font-size:11px';
-            } else if ((summary.warn ?? 0) > 0) {
-                statusEl.textContent = '경고';
-                statusEl.style.cssText = 'color:#ffd166;background:#ffd16618;border-color:#ffd16644;font-size:11px';
-            } else {
-                statusEl.textContent = '정상';
-                statusEl.style.cssText = 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044;font-size:11px';
+    // 2. Dynamic Traffic Intelligence Logic
+    let currentLogs = [];
+    let protocolChart = null;
+
+    const SERVICE_MAP = {
+        80: 'HTTP (웹 서비스)',
+        443: 'HTTPS (보안 웹)',
+        22: 'SSH (원격 제어)',
+        3389: 'RDP (원격 데스크톱)',
+        3306: 'MySQL (데이터베이스)',
+        5432: 'PostgreSQL (데이터베이스)',
+        6379: 'Redis (캐시 메모리)',
+        21: 'FTP (파일 전송)',
+        53: 'DNS (도메인 조회)',
+        8080: 'HTTP-Alt (프록시/개발)',
+        445: 'SMB (파일 공유)'
+    };
+
+    const FIELD_DESC = {
+        sourceIp: '출발지 IP: 통신을 시작한 내부 PC 혹은 서버의 주소입니다.',
+        destinationIp: '목적지 IP: 연결하려고 하는 외부 서버나 상대방의 주소입니다.',
+        protocol: '프로토콜: 통신 규약(TCP/UDP 등)입니다.',
+        bytesTransferred: '전송량: 이번 연결을 통해 이동한 데이터의 크기입니다.',
+        packetsTransferred: '패킷 수: 데이터를 쪼개서 보낸 조각의 개수입니다.',
+        duration: '통신 시간: 연결이 지속된 시간(초)입니다.',
+        isInternal: '내부 통신 여부: 동일 네트워크 내부의 통신인지 여부입니다.'
+    };
+
+    window.fetchTrafficLogs = async () => {
+        const agentName = document.getElementById('agentFilter').value;
+        const url = `/api/traffic?size=40${agentName ? '&agentName=' + encodeURIComponent(agentName) : ''}`;
+        
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            currentLogs = data.content || [];
+            
+            // 에이전트 필터 목록 자동 채우기 (최초 1회 또는 주기적)
+            updateAgentFilterList();
+            
+            renderTrafficTable(currentLogs);
+            updateProtocolStats(currentLogs);
+        } catch (err) {
+            console.error('Traffic fetch failed:', err);
+        }
+    };
+
+    async function updateAgentFilterList() {
+        const filter = document.getElementById('agentFilter');
+        if (!filter) return;
+        
+        try {
+            const resp = await fetch('/api/agents');
+            if (!resp.ok) return;
+            const agents = await resp.json();
+            
+            const currentVal = filter.value;
+            filter.innerHTML = '<option value="">모든 에이전트</option>';
+            agents.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.agentName;
+                opt.textContent = a.agentName;
+                if (a.agentName === currentVal) opt.selected = true;
+                filter.appendChild(opt);
+            });
+        } catch (e) {}
+    }
+
+    function renderTrafficTable(logs) {
+        const tbody = document.getElementById('trafficTableBody');
+        if (!tbody) return;
+        
+        const countEl = document.getElementById('trafficCount');
+        if (countEl) countEl.textContent = `${logs.length} LOGS`;
+        
+        tbody.innerHTML = logs.map((l, i) => {
+            try {
+                const time = new Date(l.timestamp).toLocaleTimeString();
+                const isAnomaly = l.isAnomaly === true;
+                
+                // 양방향 포트 분석 (인바운드 대응)
+                let service = SERVICE_MAP[l.destinationPort] || SERVICE_MAP[l.sourcePort] || 'Other';
+                let directionIcon = (SERVICE_MAP[l.sourcePort]) ? 'arrow-down-left' : 'arrow-up-right';
+                let directionColor = (SERVICE_MAP[l.sourcePort]) ? 'var(--success)' : 'var(--info)';
+
+                return `
+                    <tr onclick="showTrafficDetails(${i})" class="${isAnomaly ? 'anomaly-row' : ''}">
+                        <td class="dim" style="font-size:11px;">${time}</td>
+                        <td class="mono">
+                            <div style="font-weight:800; color:var(--accent);">${l.agentName || 'Unknown'}</div>
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
+                                <span class="mono accent">${l.sourceIp}</span>
+                                <i data-lucide="${isAnomaly ? 'alert-octagon' : directionIcon}" size="12" style="color: ${isAnomaly ? '#ff3c00' : 'var(--dim)'}"></i>
+                                <span class="mono">${l.destinationIp}</span>
+                            </div>
+                            <div class="dim" style="font-size:10px;">${service} (${l.sourcePort} → ${l.destinationPort})</div>
+                        </td>
+                        <td><span class="badge ${l.protocol === 'TCP' ? 'info' : 'warning'}" style="font-size:9px;">${l.protocol}</span></td>
+                        <td class="mono accent text-right" style="font-size:11px;">${formatSize(l.bytesTransferred)}</td>
+                        <td>
+                            ${isAnomaly ? '<span class="badge danger pulse">THREAT</span>' : '<span class="badge success">PASS</span>'}
+                        </td>
+                    </tr>
+                `;
+            } catch (e) { return ''; }
+        }).join('');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    // [작업 2] 실시간 프로세스 점유율 갱신
+    window.updateProcessStats = async () => {
+        const agentName = document.getElementById('agentFilter')?.value || '';
+        try {
+            const resp = await fetch(`/api/traffic/stats/processes?agentName=${encodeURIComponent(agentName)}`);
+            if (resp.ok) {
+                const stats = await resp.json();
+                const container = document.getElementById('processStatsWidget');
+                if (!container) return;
+                
+                if (!stats || stats.length === 0) {
+                    container.innerHTML = '<p class="dim text-center" style="padding:20px; font-size:11px;">데이터 없음</p>';
+                    return;
+                }
+
+                const maxBytes = Math.max(...stats.map(s => s.totalBytes));
+                container.innerHTML = stats.slice(0, 5).map(s => `
+                    <div class="stat-bar-container mb12">
+                        <div class="flex justify-between mb4" style="display:flex; justify-content:space-between;">
+                            <span class="text-11 white" style="font-size:11px; color:#fff;">${s.processName}</span>
+                            <span class="text-11 accent mono" style="font-size:11px; color:var(--accent);">${formatSize(s.totalBytes)}</span>
+                        </div>
+                        <div class="stat-bar-bg">
+                            <div class="stat-bar-fill" style="width: ${(s.totalBytes/maxBytes*100)}%;"></div>
+                        </div>
+                    </div>
+                `).join('');
             }
-        }
-    }
+        } catch(e) {}
+    };
 
-    function poll() {
-        fetch('/api/network/topology')
-            .then(r => r.json())
-            .then(data => {
-                buildSvg(data.nodes, data.links, data.viewBoxH || 100, data.hasAgents);
-                updateStatusPanel(data.nodes);
-                updateSummary(data.summary);
-                const upd = document.getElementById('topoLastUpdate');
-                if (upd) upd.textContent = new Date(data.timestamp).toLocaleTimeString('ko-KR');
-            })
-            .catch(() => {
-                const statusEl = document.getElementById('topoStatus');
-                if (statusEl) {
-                    statusEl.textContent = '연결 끊김';
-                    statusEl.style.cssText = 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44;font-size:11px';
+    // [작업 4] 원격 프로세스 종료 버튼 연동
+    window.killTargetProcess = async (pid, processName) => {
+        const agentName = document.getElementById('agentFilter')?.value;
+        if (!agentName) { alert("에이전트를 먼저 선택해야 명령을 보낼 수 있습니다."); return; }
+        if (!confirm(`정말로 [${processName} (PID: ${pid})]를 강제 종료하시겠습니까?`)) return;
+
+        try {
+            const resp = await fetch(`/api/traffic/kill-process?agentName=${encodeURIComponent(agentName)}&pid=${pid}&processName=${encodeURIComponent(processName)}`, { method: 'POST' });
+            const res = await resp.json();
+            alert(res.message);
+        } catch(e) { alert("명령 전달 실패: " + e.message); }
+    };
+
+    window.showTrafficDetails = async (idx) => {
+        const log = currentLogs[idx];
+        const detailPanel = document.getElementById('trafficDetails');
+        if (!log || !detailPanel) return;
+
+        const targetIp = (SERVICE_MAP[log.sourcePort]) ? log.sourceIp : log.destinationIp;
+        detailPanel.innerHTML = '<div style="padding:40px; text-align:center;"><div class="spinner mb16"></div><p class="dim" style="font-size:11px;">분석 중...</p></div>';
+
+        let ipInfo = { org: '조회 실패', isp: 'Unknown', country: 'Unknown' };
+        try {
+            const resp = await fetch(`/api/traffic/ip-info/${targetIp}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.status !== 'fail') ipInfo = data;
+            }
+        } catch(e) {}
+
+        const service = SERVICE_MAP[log.destinationPort] || SERVICE_MAP[log.sourcePort] || '알 수 없는 서비스';
+        let metaHtml = '';
+        let processInfoHtml = '';
+
+        if (log.rawData) {
+            try {
+                const meta = JSON.parse(log.rawData);
+                metaHtml = `
+                    <div class="meta-grid">
+                        <div class="meta-item"><label>Local Addr</label><span>${meta.laddr || '-'}</span></div>
+                        <div class="meta-item"><label>Remote Addr</label><span>${meta.raddr || '-'}</span></div>
+                        <div class="meta-item"><label>Status</label><span class="badge ${meta.status==='ESTABLISHED'?'success':'dim'}">${meta.status || '-'}</span></div>
+                        <div class="meta-item"><label>PID</label><span class="mono">${meta.pid || '-'}</span></div>
+                    </div>
+                `;
+                if (meta.process_name) {
+                    processInfoHtml = `
+                        <div class="intelligence-card mb16" style="background: rgba(255,172,0,0.1); border-color: rgba(255,172,0,0.3);">
+                            <div class="card-sub mb4" style="color:#ffac00; font-size:10px;">EXECUTING APP</div>
+                            <div class="entity-name mb4" style="font-size:16px;">${meta.process_name}</div>
+                            <div class="entity-sub dim">PID: ${meta.pid}</div>
+                        </div>
+                    `;
+                }
+            } catch(e) { metaHtml = '<p class="dim">데이터 파싱 에러</p>'; }
+        }
+
+        detailPanel.innerHTML = `
+            <div class="detail-box animated fadeIn">
+                ${processInfoHtml}
+                <div class="intelligence-card mb16">
+                    <div class="card-sub mb4" style="color:#00f2ff; font-size:10px;">IDENTITY INTEL</div>
+                    <div class="entity-name mb4" style="font-size:16px;">${ipInfo.org || ipInfo.isp}</div>
+                    <div class="entity-sub dim">${ipInfo.country}</div>
+                </div>
+                <div class="detail-section mt16">
+                    <div class="card-sub mb8 accent" style="font-size:10px;">SOCKET DETAILS</div>
+                    ${metaHtml}
+                </div>
+                <div class="mt24">
+                    <button class="btn-block-action" onclick="blockTarget('${targetIp}')">이 IP 차단</button>
+                    ${(log.rawData && JSON.parse(log.rawData).pid) ? 
+                        `<button class="btn-block-action mt8" style="background:rgba(255,255,255,0.05); color:#fff; box-shadow:none; border:1px solid rgba(255,255,255,0.1);" 
+                         onclick="killTargetProcess(${JSON.parse(log.rawData).pid}, '${JSON.parse(log.rawData).process_name}')">프로세스 강제 종료</button>` : ''}
+                </div>
+            </div>
+        `;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    };
+
+    window.blockTarget = async (ip) => {
+        if (!confirm(`${ip} 차단하시겠습니까?`)) return;
+        try {
+            const resp = await fetch('/api/traffic/block', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip: ip, reason: 'Manual Block' })
+            });
+            alert((await resp.json()).message);
+        } catch (e) { alert(e); }
+    };
+
+    function updateProtocolStats(logs) {
+        const pMap = {};
+        logs.forEach(l => {
+            pMap[l.protocol] = (pMap[l.protocol] || 0) + 1;
+        });
+        
+        const labels = Object.keys(pMap);
+        const data = Object.values(pMap);
+        
+        const ctx = document.getElementById('protocolChartCanvas');
+        if (!ctx) return;
+        
+        if (protocolChart) {
+            protocolChart.data.labels = labels;
+            protocolChart.data.datasets[0].data = data;
+            protocolChart.update();
+        } else {
+            protocolChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#00f2ff', '#06d6a0', '#ffd166', '#ff3d5a', '#ff8c42', '#ab47bc', '#4a5570'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'right', labels: { color: '#fff', font: { size: 10 } } }
+                    },
+                    cutout: '70%'
                 }
             });
+        }
     }
 
-    poll();
-    setInterval(poll, 5000);
-})();
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    fetchTrafficLogs();
+    updateProcessStats();
+    setInterval(fetchTrafficLogs, 5000);
+    setInterval(updateProcessStats, 10000);
+});
+
+function focusNode(id) { console.log("Focus:", id); }
+/*]]>*/
 </script>
-</th:block>
 
-<!-- 인터페이스 -->
-<th:block th:if="${tab == 'interfaces'}">
-<div class="card">
-    <div class="card-header"><div class="card-title">네트워크 인터페이스</div></div>
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead><tr><th>인터페이스</th><th>IP 주소</th><th>속도</th><th>TX</th><th>RX</th><th>패킷</th><th>오류</th><th>상태</th></tr></thead>
-            <tbody>
-                <tr th:each="iface : ${interfaces}">
-                    <td class="mono accent" th:text="${iface.name}"></td>
-                    <td class="mono dim" th:text="${iface.ip}"></td>
-                    <td class="dim" th:text="${iface.speed}"></td>
-                    <td class="mono red" th:text="${iface.tx}"></td>
-                    <td class="mono green" th:text="${iface.rx}"></td>
-                    <td class="mono dim" th:text="${iface.packets}"></td>
-                    <td th:text="${iface.errors}"
-                        th:style="${iface.errors != '0'} ? 'color:#ffd166' : 'color:#2a3248'"></td>
-                    <td>
-                        <span class="tag"
-                              th:text="${iface.status}"
-                              th:style="${iface.status == 'up'} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44'">
-                        </span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-</th:block>
+<style>
+    .network-main-layout { display: grid; grid-template-columns: 1fr 300px; gap: 24px; width: 100%; }
+    .topology-container { background: radial-gradient(circle at 50% 20%, rgba(0,242,255,0.08), transparent 70%); }
+    .node-status-card { padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; margin-bottom: 8px; cursor: pointer; transition: 0.2s; }
+    .node-status-card:hover { background: rgba(255,255,255,0.07); border-color: var(--accent); transform: translateX(4px); }
+    
+    .traffic-analytics-container { display: grid; grid-template-columns: 1fr 380px; gap: 24px; min-height: 600px; }
+    
+    .glass-select { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 4px 12px; font-size: 11px; outline: none; cursor: pointer; transition: 0.2s; }
+    .glass-select:hover { border-color: var(--accent); background: rgba(255, 255, 255, 0.1); }
+    .glass-select option { background: #1a1a1a; color: #fff; }
 
-<!-- 트래픽 분석 -->
-<th:block th:if="${tab == 'traffic'}">
-<div class="grid-2">
-    <div class="card">
-        <div class="card-header"><div class="card-title">프로토콜별 분포</div></div>
-        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">HTTPS</span><span class="mono accent">52%</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:52%;background:#00e5ff"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">HTTP</span><span class="mono accent">18%</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:18%;background:#06d6a0"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">DNS</span><span class="mono accent">12%</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:12%;background:#ffd166"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">SSH</span><span class="mono accent">8%</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:8%;background:#ff8c42"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="dim">기타</span><span class="mono accent">10%</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:10%;background:#4a5570"></div></div>
-            </div>
-        </div>
-    </div>
-    <div class="card">
-        <div class="card-header"><div class="card-title">Top 소스 IP</div></div>
-        <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">203.45.88.12</span><span class="mono" style="color:#ff3d5a">1284</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:100%;background:#ff3d5a"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">88.11.204.5</span><span class="mono" style="color:#ff8c42">892</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:69.5%;background:#ff8c42"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">192.168.43.22</span><span class="mono" style="color:#ffd166">441</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:34.3%;background:#ffd166"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">10.0.0.88</span><span class="mono" style="color:#06d6a0">284</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:22.1%;background:#06d6a0"></div></div>
-            </div>
-            <div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="mono dim">45.90.123.4</span><span class="mono" style="color:#00e5ff">192</span></div>
-                <div class="progress-bar"><div class="progress-fill" style="width:15%;background:#00e5ff"></div></div>
-            </div>
-        </div>
-    </div>
-</div>
-</th:block>
+    .main-stream { display: flex; flex-direction: column; overflow: hidden; }
+    .traffic-info-sidebar { display: flex; flex-direction: column; }
+    .inspector-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .inspector-content { padding: 24px; flex: 1; }
+    
+    .anomaly-row { background: rgba(255, 60, 0, 0.05) !important; border-left: 3px solid #ff3c00; }
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    .stat-bar-bg { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; margin-top:4px; }
+    .stat-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00f2ff); border-radius: 3px; transition: width 1s ease-out; }
+
+    .detail-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px; }
+    .detail-row label { color: var(--dim); }
+    
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(0,0,0,0.2); padding: 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); }
+    .meta-item { display: flex; flex-direction: column; gap: 4px; }
+    .meta-item label { font-size: 9px; color: var(--dim); text-transform: uppercase; }
+    .meta-item span { font-size: 11px; color: #fff; font-family: 'JetBrains Mono', monospace; }
+
+    .btn-refresh { background: none; border: none; color: var(--dim); cursor: pointer; transition: 0.2s; padding: 4px; display: flex; align-items: center; }
+    .btn-refresh:hover { color: var(--accent); transform: rotate(180deg); }
+    .btn-mini { padding: 4px 10px; border-radius: 4px; border: none; font-size: 10px; font-weight: 700; cursor: pointer; }
+    .btn-mini.danger { background: rgba(255,0,85,0.15); color: #ff0055; border: 1px solid rgba(255,0,85,0.3); }
+    
+    .btn-block-action { width: 100%; padding: 12px; background: #ff0055; color: #fff; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; box-shadow: 0 0 20px rgba(255,0,85,0.4); }
+    .btn-block-action:hover { filter: brightness(1.2); }
+
+    .intelligence-card { background: linear-gradient(135deg, rgba(0, 242, 255, 0.1), rgba(70, 0, 255, 0.05)); border: 1px solid rgba(0, 242, 255, 0.2); border-radius: 12px; padding: 16px; }
+    .entity-name { font-size: 18px; font-weight: 800; color: #fff; }
+    .entity-sub { font-size: 11px; text-transform: uppercase; }
+    
+    .spinner { width: 24px; height: 24px; border: 2px solid rgba(0,242,255,0.1); border-top: 2px solid var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    .spinner-sm { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.05); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animated.fadeIn { animation: fadeIn 0.4s ease-out; }
+
+    .segmented-nav { display: flex; gap: 4px; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 12px; border: 1px solid var(--glass-border); width: fit-content; }
+    .nav-item { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; color: var(--dim); text-decoration: none; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
+    .nav-item.active { background: var(--accent); color: #000; box-shadow: 0 0 15px var(--accent-glow); }
+</style>
 
 </content>
 </body>

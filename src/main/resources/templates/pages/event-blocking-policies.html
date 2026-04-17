@@ -4,7 +4,7 @@
 <body>
 <content>
 
-<div class="card mb16">
+<div class="glass-card premium-glass mb16">
     <div class="card-header">
         <div>
             <div class="card-title">에이전트 보안 이벤트 차단 정책</div>
@@ -14,10 +14,12 @@
                 Suricata·시스로그 수집 경로는 기존 매핑을 유지합니다.
             </div>
         </div>
-        <button class="btn-sm accent" onclick="openAddModal()">+ 정책 추가</button>
+        <button class="btn-accent" onclick="openAddModal()">
+            <i data-lucide="plus" size="14"></i> 정책 추가
+        </button>
     </div>
-    <div class="table-wrap">
-        <table class="data-table">
+    <div class="table-container">
+        <table class="p-table cyber-table">
             <thead>
             <tr>
                 <th>순위</th>
@@ -49,20 +51,20 @@
                 <td class="mono dim" style="font-size:11px" th:text="${p.eventTypePattern}"></td>
                 <td class="dim" th:text="${p.severity != null ? p.severity : '—'}"></td>
                 <td class="mono dim" style="font-size:11px" th:text="${p.sourceIpPrefix != null ? p.sourceIpPrefix : '—'}"></td>
-                <td>
-                    <span class="tag"
+                <td style="text-align:center;">
+                    <span class="badge"
                           th:text="${p.blocked} ? '차단' : '탐지만'"
-                          th:style="${p.blocked} ? 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44' : 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044'"></span>
+                          th:style="${p.blocked} ? 'color:var(--danger);background:rgba(239,68,68,0.1);border:1px solid var(--danger)' : 'color:var(--success);background:rgba(16,185,129,0.1);border:1px solid var(--success)'"></span>
                 </td>
-                <td>
-                    <span class="tag"
+                <td style="text-align:center;">
+                    <span class="badge"
                           th:text="${p.enabled} ? '활성' : '비활성'"
-                          th:style="${p.enabled} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#4a5570;background:#4a557018;border-color:#4a557044'"></span>
+                          th:style="${p.enabled} ? 'color:var(--success);background:rgba(16,185,129,0.1);border:1px solid var(--success)' : 'color:var(--muted);background:rgba(255,255,255,0.03);border:1px solid var(--glass-border)'"></span>
                 </td>
                 <td>
-                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                    <div style="display:flex;gap:8px;">
                         <button class="btn-sm dim" onclick="openEditModal(this.closest('tr'))">수정</button>
-                        <button class="btn-sm" style="color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44"
+                        <button class="btn-danger"
                                 th:data-id="${p.id}" th:data-name="${p.name}" onclick="deletePolicy(this)">삭제</button>
                     </div>
                 </td>
@@ -72,8 +74,8 @@
     </div>
 </div>
 
-<div class="card" style="padding:16px 20px">
-    <div class="card-title mb8">패턴 도움말</div>
+<div class="glass-card premium-glass p24">
+    <div class="card-title mb16">패턴 도움말</div>
     <ul class="dim" style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">
         <li><code>*</code> — 모든 이벤트 유형</li>
         <li><code>FILE_*</code> — <code>FILE_</code>로 시작하는 유형</li>
@@ -82,13 +84,13 @@
     </ul>
 </div>
 
-<div id="addModal" class="modal-overlay" style="display:none">
-    <div class="card modal-box">
+<div id="addModal" class="modal-overlay">
+    <div class="glass-card premium-glass modal-box">
         <div class="card-header">
             <div class="card-title">정책 추가</div>
             <button onclick="closeAddModal()" class="btn-icon">×</button>
         </div>
-        <div style="padding:16px 20px">
+        <div class="p24">
             <div class="modal-field">
                 <label>이름 *</label>
                 <input type="text" id="addName" placeholder="예: 특정 IP의 파일 변경 차단"/>
@@ -124,20 +126,22 @@
                 </select>
             </div>
             <div class="detail-actions">
-                <button class="btn-accent" onclick="submitAdd()">추가</button>
-                <button class="btn-sm dim" onclick="closeAddModal()">취소</button>
+                <button class="btn-accent" onclick="submitAdd()">
+                    <i data-lucide="check" size="14"></i> 추가
+                </button>
+                <button class="btn-glass" onclick="closeAddModal()">취소</button>
             </div>
         </div>
     </div>
 </div>
 
-<div id="editModal" class="modal-overlay" style="display:none">
-    <div class="card modal-box">
+<div id="editModal" class="modal-overlay">
+    <div class="glass-card premium-glass modal-box">
         <div class="card-header">
             <div class="card-title">정책 수정</div>
             <button onclick="closeEditModal()" class="btn-icon">×</button>
         </div>
-        <div style="padding:16px 20px">
+        <div class="p24">
             <input type="hidden" id="editId"/>
             <div class="modal-field">
                 <label>이름 *</label>
@@ -174,8 +178,10 @@
                 </select>
             </div>
             <div class="detail-actions">
-                <button class="btn-accent" onclick="submitEdit()">저장</button>
-                <button class="btn-sm dim" onclick="closeEditModal()">취소</button>
+                <button class="btn-accent" onclick="submitEdit()">
+                    <i data-lucide="save" size="14"></i> 저장
+                </button>
+                <button class="btn-glass" onclick="closeEditModal()">취소</button>
             </div>
         </div>
     </div>
@@ -191,6 +197,7 @@ function openAddModal() {
     document.getElementById('addPriority').value = '10';
     document.getElementById('addEnabled').value = 'true';
     document.getElementById('addModal').style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
 
@@ -229,6 +236,7 @@ function openEditModal(row) {
     document.getElementById('editPriority').value = d.priority;
     document.getElementById('editEnabled').value = d.enabled === 'true' ? 'true' : 'false';
     document.getElementById('editModal').style.display = 'flex';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
 

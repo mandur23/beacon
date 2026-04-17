@@ -14,4 +14,6 @@ public class AgentHeartbeatRequest {
     @NotBlank(message = "agentName은 필수입니다")
     @Size(max = 100)
     private String agentName;
+
+    private String metadata;
 }

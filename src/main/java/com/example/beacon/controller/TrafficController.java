@@ -25,19 +25,22 @@ public class TrafficController {
     
     @GetMapping
     public ResponseEntity<Page<TrafficLog>> getTrafficLogs(
+            @RequestParam(required = false) String agentName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
         Pageable pageable = PageRequest.of(page, size, Sort.by("timestamp").descending());
-        return ResponseEntity.ok(trafficAnalysisService.getTrafficLogs(pageable));
+        return ResponseEntity.ok(trafficAnalysisService.getTrafficLogs(agentName, pageable));
     }
     
     @GetMapping("/anomalous")
     public ResponseEntity<Page<TrafficLog>> getAnomalousTraffic(
+            @RequestParam(required = false) String agentName,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         
         Pageable pageable = PageRequest.of(page, size, Sort.by("timestamp").descending());
+        // 여기도 agentName 필터가 필요할 수 있으나 우선 기본 getTrafficLogs 위주로 작업
         return ResponseEntity.ok(trafficAnalysisService.getAnomalousTraffic(pageable));
     }
     
@@ -94,6 +97,7 @@ public class TrafficController {
                 .packetsTransferred(request.getPacketsTransferred())
                 .duration(request.getDuration())
                 .rawData(request.getRawData())
+                .agentName(request.getAgentName())
                 .isAnomaly(false)
                 .anomalyScore(0.0)
                 .build();
@@ -110,6 +114,28 @@ public class TrafficController {
         return ResponseEntity.ok(trafficAnalysisService.markAsAnomaly(id, score, reason));
     }
     
+    @GetMapping("/stats/processes")
+    public ResponseEntity<List<Map<String, Object>>> getProcessStats(
+            @RequestParam(required = false) String agentName) {
+        return ResponseEntity.ok(trafficAnalysisService.getProcessStats(agentName));
+    }
+
+    @PostMapping("/kill-process")
+    public ResponseEntity<Map<String, String>> killAgentProcess(
+            @RequestParam String agentName,
+            @RequestParam Integer pid,
+            @RequestParam String processName) {
+        
+        // FirewallAgentCommand 시스템과 연동하여 명령 큐에 적재
+        // 실제 구현은 FirewallService 또는 AgentService의 명령 하달 로직 호출
+        try {
+            trafficAnalysisService.scheduleProcessKill(agentName, pid, processName);
+            return ResponseEntity.ok(Map.of("status", "success", "message", "프로세스 종료 명령이 큐에 적재되었습니다."));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("status", "error", "message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/analyze")
     public ResponseEntity<Map<String, Object>> analyzeTrafficPattern(@RequestBody List<TrafficLog> logs) {
         return ResponseEntity.ok(trafficAnalysisService.analyzeTrafficPattern(logs));

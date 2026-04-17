@@ -4,290 +4,429 @@
 <body>
 <content>
 
-<div class="grid-4 mb16">
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">총 계정</div>
-        <div class="stat-value accent" th:text="${userStats.total}"></div>
-    </div>
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">활성</div>
-        <div class="stat-value green" th:text="${userStats.active}"></div>
-    </div>
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">MFA 미적용</div>
-        <div class="stat-value yellow" th:text="${userStats.noMfa}"></div>
-    </div>
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">비활성</div>
-        <div class="stat-value dim" th:text="${userStats.offline}"></div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <div>
-            <div class="card-title">사용자 목록</div>
-            <div class="card-sub">접근 권한 관리</div>
+<!-- Section 1: Identity & Security Metrics -->
+<div class="grid-metrics mb24">
+    <div class="premium-glass kpi-box" style="--metric-color: var(--accent);">
+        <div class="metric-header">
+            <span class="metric-label">전체 식별 계정</span>
+            <i data-lucide="users"></i>
         </div>
-        <button class="btn-sm accent" onclick="openAddUserModal()">+ 사용자 추가</button>
+        <div class="metric-val" th:text="${userStats.total}">0</div>
+        <div class="metric-sub">시스템에 등록된 전체 사용자</div>
     </div>
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>ID</th><th>이름</th><th>역할</th><th>이메일</th>
-                    <th>상태</th><th>MFA</th><th>마지막 로그인</th><th>권한</th><th>작업</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="u : ${users}" class="clickable-row"
-                    th:data-dbid="${u.dbId}"
-                    th:data-id="${u.id}" th:data-name="${u.name}"
-                    th:data-role="${u.role}" th:data-email="${u.email}"
-                    th:data-status="${u.status}" th:data-statuslabel="${u.statusLabel}"
-                    th:data-statuscolor="${u.statusColor}"
-                    th:data-mfa="${u.mfa}" th:data-login="${u.lastLogin}"
-                    th:data-count="${u.loginCount}">
-                    <td class="mono accent" th:text="${u.id}"></td>
-                    <td style="font-weight:600" th:text="${u.name}"></td>
-                    <td class="dim" th:text="${u.role}"></td>
-                    <td class="dim" style="font-size:10px" th:text="${u.email}"></td>
-                    <td>
-                        <span style="display:flex;align-items:center;gap:5px;font-size:10px"
-                              th:style="'display:flex;align-items:center;gap:5px;font-size:10px;color:' + ${u.statusColor}">
-                            <span class="dot" th:style="'background:' + ${u.statusColor}"></span>
-                            <span th:text="${u.statusLabel}"></span>
-                        </span>
-                    </td>
-                    <td>
-                        <span class="tag"
-                              th:text="${u.mfa} ? '활성' : '미설정'"
-                              th:style="${u.mfa} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ff3d5a;background:#ff3d5a18;border-color:#ff3d5a44'">
-                        </span>
-                    </td>
-                    <td class="muted" th:text="${u.lastLogin}"></td>
-                    <td>
-                        <div style="display:flex;gap:4px;flex-wrap:wrap">
-                            <span th:each="p : ${u.perms}" class="tag accent" th:text="${p}"></span>
-                        </div>
-                    </td>
-                    <td>
-                        <button class="btn-sm dim edit-btn">편집</button>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="premium-glass kpi-box" style="--metric-color: var(--success);">
+        <div class="metric-header">
+            <span class="metric-label">MFA 활성화율</span>
+            <i data-lucide="shield-check" class="success"></i>
+        </div>
+        <div class="metric-val glow-text" th:text="${userStats.total > 0 ? (userStats.total - userStats.noMfa) * 100 / userStats.total : 0} + '%'">0%</div>
+        <div class="metric-sub">2단계 인증으로 보호된 계정</div>
+    </div>
+    <div class="premium-glass kpi-box" style="--metric-color: var(--warning); cursor: pointer; transition: transform 0.2s;" onclick="openSessionInspector()">
+        <div class="metric-header">
+            <span class="metric-label">활성 콘솔 세션 (Sessions) <i data-lucide="external-link" size="10"></i></span>
+            <i data-lucide="radio" class="warning pulse-alive"></i>
+        </div>
+        <div class="metric-val" th:text="${userStats.active}">0</div>
+        <div class="metric-sub">보안 콘솔에 연결된 총 세션 수</div>
     </div>
 </div>
 
-<!-- 편집 패널 -->
-<div id="editPanel" class="card" style="display:none;margin-top:14px">
-    <div class="card-header">
-        <div class="card-title">사용자 편집</div>
-        <button onclick="closeEdit()" class="btn-icon">×</button>
-    </div>
-    <div style="padding:16px 20px">
-        <div id="editContent"></div>
-    </div>
-</div>
-
-<!-- 사용자 추가 모달 -->
-<div id="addUserModal" class="modal-overlay" style="display:none">
-    <div class="card modal-box">
+<!-- Section 2: Split View Access Console -->
+<div class="access-split-container">
+    
+    <!-- Left: Identity Management (60%) -->
+    <div class="premium-glass console-left">
         <div class="card-header">
-            <div class="card-title">사용자 추가</div>
-            <button onclick="closeAddUserModal()" class="btn-icon">×</button>
+            <div>
+                <div class="card-title glow-text">계정 및 권한 관리 (IAM)</div>
+                <div class="card-sub">관리 대상 식별자 정보 및 보안 속성 제어</div>
+            </div>
         </div>
-        <div style="padding:16px 20px">
-            <div class="modal-field">
-                <label>사용자명 *</label>
-                <input type="text" id="newUsername" placeholder="예: jsmith"/>
-            </div>
-            <div class="modal-field">
-                <label>이름</label>
-                <input type="text" id="newName" placeholder="예: 홍길동"/>
-            </div>
-            <div class="modal-field">
-                <label>이메일</label>
-                <input type="email" id="newEmail" placeholder="예: user@beacon.local"/>
-            </div>
-            <div class="modal-field">
-                <label>역할</label>
-                <select id="newRole">
-                    <option value="ROLE_ANALYST">ANALYST — 분석가</option>
-                    <option value="ROLE_VIEWER">VIEWER — 읽기 전용</option>
-                    <option value="ROLE_ADMIN">ADMIN — 관리자</option>
-                </select>
-            </div>
-            <div class="modal-field">
-                <label>초기 비밀번호 (미입력 시 자동 설정)</label>
-                <input type="password" id="newPassword" placeholder="비밀번호"/>
-            </div>
-            <div class="detail-actions">
-                <button class="btn-accent" onclick="submitAddUser()">추가</button>
-                <button class="btn-sm dim" onclick="closeAddUserModal()">취소</button>
-            </div>
+        
+        <div class="table-container">
+            <table class="p-table cyber-table">
+                <thead>
+                    <tr>
+                        <th>식별자 ID</th>
+                        <th>사용자 이름</th>
+                        <th>시스템 역할 (Role)</th>
+                        <th>MFA 상태</th>
+                        <th>최근 접속</th>
+                        <th style="width:100px; text-align:right;">관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="u : ${users}" class="user-row" 
+                        th:data-dbid="${u.dbId}"
+                        th:data-id="${u.id}"
+                        th:data-name="${u.name}"
+                        th:data-email="${u.email}"
+                        th:data-role="${u.role}"
+                        th:data-mfa="${u.mfa}"
+                        th:data-last="${u.lastLogin}"
+                        th:data-status="${u.statusLabel}"
+                        th:style="${u.statusLabel == 'Suspended'} ? 'opacity:0.4; filter:grayscale(1);' : ''">
+                        <td class="mono accent" th:text="${u.id}"></td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div class="avatar-sm" th:style="'background:' + ${u.statusColor} + '33; border:1px solid ' + ${u.statusColor}">
+                                    <i data-lucide="user" size="12" th:style="'color:' + ${u.statusColor}"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight:600; color:#fff;" th:text="${u.name}"></div>
+                                    <div class="dim" style="font-size:10px;" th:text="${u.email}"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-role" th:classappend="${#strings.contains(u.role, 'ADMIN')} ? 'role-admin' : (${#strings.contains(u.role, 'ANALYST')} ? 'role-analyst' : 'role-viewer')">
+                                <th:block th:text="${u.role}"></th:block>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge" th:style="${u.mfa} ? 'color:var(--success); background:rgba(16,185,129,0.1); border:1px solid var(--success-glow);' : 'color:var(--danger); background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);'">
+                                <i th:data-lucide="${u.mfa ? 'shield-check' : 'shield-alert'}" size="12"></i>
+                                <th:block th:text="${u.mfa ? '보호 중' : '취약함'}"></th:block>
+                            </span>
+                        </td>
+                        <td class="mono dim" style="font-size:11px;" th:text="${u.lastLogin}"></td>
+                        <td style="text-align:right;">
+                            <button class="icon-btn" th:onclick="'showUserDetail(' + ${u.dbId} + ')'"><i data-lucide="more-horizontal"></i></button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
-</div>
 
-<!-- 권한 수정 모달 -->
-<div id="permModal" class="modal-overlay" style="display:none">
-    <div class="card modal-box">
+    <!-- Right: Session Intelligence (40%) -->
+    <div class="premium-glass console-right">
         <div class="card-header">
-            <div class="card-title" id="permModalTitle">역할 수정</div>
-            <button onclick="closePermModal()" class="btn-icon">×</button>
-        </div>
-        <div style="padding:16px 20px">
-            <div class="modal-field">
-                <label>역할 선택</label>
-                <select id="permRoleSelect">
-                    <option value="ROLE_ADMIN">ADMIN — 관리자</option>
-                    <option value="ROLE_ANALYST">ANALYST — 분석가</option>
-                    <option value="ROLE_VIEWER">VIEWER — 읽기 전용</option>
-                </select>
+            <div>
+                <div class="card-title glow-text" style="font-size:16px;">관리 콘솔 접속 감시 (Web Access Feed)</div>
+                <div class="card-sub">현재 보안 관리자의 대시보드 접속 유효성 분석</div>
             </div>
-            <div class="detail-actions">
-                <button class="btn-accent" id="permSaveBtn">저장</button>
-                <button class="btn-sm dim" onclick="closePermModal()">취소</button>
+            <i data-lucide="radio" class="pulse-opacity success"></i>
+        </div>
+        <div class="session-feed-body">
+            <div th:each="s : ${activeSessions}" class="session-card" th:classappend="${s.riskScore > 7.0} ? 'risk-critical' : (${s.riskScore > 3.0} ? 'risk-medium' : '')">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="cpu" size="14" class="dim"></i>
+                        <span class="mono fw-800" style="color:#fff;" th:text="${s.user}">User</span>
+                    </div>
+                    <span class="badge mono" th:style="'background:rgba(255,255,255,0.05); color:' + (${s.riskScore > 7.0} ? 'var(--danger)' : (${s.riskScore > 3.0} ? 'var(--warning)' : 'var(--success)'))">
+                        Score: <th:block th:text="${s.riskScore}"></th:block>
+                    </span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px;">
+                    <div class="info-item"><i data-lucide="map-pin" size="10"></i> <span th:text="${s.ip}"></span></div>
+                    <div class="info-item" style="justify-content:flex-end;"><i data-lucide="clock" size="10"></i> <span th:text="${s.time}"></span></div>
+                </div>
+                <div class="session-actions" th:if="${s.riskScore > 7.0}">
+                    <button class="btn-danger-sm" style="width:100%; border-radius:6px; font-size:10px; padding:6px; margin-top:12px;">
+                        <i data-lucide="log-out" size="10"></i> 세션 강제 종료 (Terminate)
+                    </button>
+                </div>
+            </div>
+            <div th:if="${#lists.isEmpty(activeSessions)}" style="padding:48px; text-align:center; color:var(--dim);">
+                <i data-lucide="shield-check" size="32" style="opacity:0.2; margin-bottom:12px; color:var(--success);"></i>
+                <p style="font-size:12px;">현재 본인 세션 외에 추가로 탐지된 활성 보안 세션이 없습니다.</p>
+                <p style="font-size:10px; margin-top:8px; opacity:0.6;">(모든 보안 정책이 본인 계정에 의해 정상 통제 중입니다)</p>
             </div>
         </div>
     </div>
 </div>
 
-<script th:inline="none">
-function escapeHtml(str) {
-    if (str == null) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;');
-}
+<!-- User Details (IAM Inspector) Drawer -->
+<div id="userInspectorPanel" class="agent-inspector" style="width: 500px;">
+    <div class="inspector-header">
+        <div style="display:flex; align-items:center; gap:16px;">
+            <div id="userInspIcon" class="avatar-sm" style="background:var(--accent-glow);">
+                <i data-lucide="user" class="accent"></i>
+            </div>
+            <div>
+                <h3 id="userInspName" style="color:#fff;">Username</h3>
+                <p id="userInspId" class="dim mono" style="font-size:12px;">ID</p>
+            </div>
+        </div>
+        <button class="icon-btn" onclick="closeUserInspector()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="inspector-body">
+        <div class="inspector-section">
+            <h4 class="inspector-label"><i data-lucide="shield" size="14"></i> 권한 및 보안 설정</h4>
+            <div class="inspector-grid">
+                <div class="info-item"><label>이메일</label><span id="userInspEmail"></span></div>
+                <div class="info-item"><label>시스템 역할</label><span id="userInspRole" class="badge-role role-analyst"></span></div>
+                <div class="info-item"><label>MFA 상태</label><span id="userInspMfa"></span></div>
+                <div class="info-item"><label>계정 상태</label><span id="userInspStatus"></span></div>
+                <div class="info-item"><label>마지막 접속</label><span id="userInspLast" class="dim mono"></span></div>
+            </div>
+        </div>
+        
+        <div class="inspector-section" style="padding:16px; background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.2); border-radius:12px;">
+            <p style="font-size:12px; color:var(--danger); font-weight:700; margin-bottom:8px;">위험 관리</p>
+            <p style="font-size:11px; color:var(--dim); margin-bottom:12px;">이 계정의 모든 활성 세션을 즉시 종료하고 계정을 일시 정지합니다.</p>
+            <button class="btn-danger-sm" style="width:100%; padding:10px; border-radius:8px;">계정 강제 격리 (SUSPEND)</button>
+        </div>
+    </div>
+    <div class="inspector-footer">
+        <button class="btn-glass" style="width:100%;" onclick="closeUserInspector()">닫기</button>
+    </div>
+</div>
 
-document.querySelectorAll('.edit-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-        e.stopPropagation();
-        const row = btn.closest('tr');
+<!-- Session Details Drawer -->
+<div id="sessionInspectorPanel" class="agent-inspector" style="width: 500px;">
+    <div class="inspector-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <i data-lucide="monitor" class="warning"></i>
+            <h3 style="color:#fff;">접속 세션 상세 분석</h3>
+        </div>
+        <button class="icon-btn" onclick="closeSessionInspector()"><i data-lucide="x"></i></button>
+    </div>
+    <div class="inspector-body">
+        <div class="inspector-section">
+            <h4 class="inspector-label">활성 세션 리스트</h4>
+            <div id="sessionDetailedList" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- JS dynamic injection -->
+            </div>
+        </div>
+    </div>
+    <div class="inspector-footer">
+        <button class="btn-glass" style="width:100%;" onclick="closeSessionInspector()">닫기</button>
+    </div>
+</div>
+
+<!-- Inspector Backdrop -->
+<div id="detailBackdrop" class="inspector-backdrop" onclick="closeAllInspectors()"></div>
+
+<script th:inline="javascript">
+    const activeSessions = /*[[${activeSessions}]]*/ [];
+
+    function showUserDetail(dbId) {
+        const row = document.querySelector(`.user-row[data-dbid="${dbId}"]`);
+        if (!row) return;
+
         const d = row.dataset;
-        const dbId = encodeURIComponent(d.dbid);
-        document.getElementById('editPanel').style.display = 'block';
-        const mfaWarn = d.mfa === 'false'
-            ? `<div class="alert alert-warn" style="margin-top:10px">⚠ MFA가 설정되지 않았습니다. 즉시 설정을 권장합니다.</div>` : '';
-        const nameInitial = escapeHtml(d.name ? d.name[0] : '?');
-        document.getElementById('editContent').innerHTML = `
-            <div style="text-align:center;margin-bottom:16px">
-                <div style="width:52px;height:52px;border-radius:50%;background:#1a2a3a;display:inline-flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700">${nameInitial}</div>
-            </div>
-            ${[['이름',escapeHtml(d.name)],['ID',escapeHtml(d.id)],['역할',escapeHtml(d.role)],['이메일',escapeHtml(d.email)],['마지막 로그인',escapeHtml(d.login)],['총 로그인',escapeHtml(d.count)+'회']].map(([k,v])=>
-                `<div class="detail-row"><span class="dim">${k}</span><span class="mono">${v}</span></div>`
-            ).join('')}
-            <div class="detail-actions" style="margin-top:12px">
-                ${d.status === 'active'
-                    ? `<button class="btn-danger" id="lockBtn">계정 잠금</button>`
-                    : `<button class="btn-success" id="unlockBtn">계정 해제</button>`
-                }
-                <button class="btn-accent" id="permBtn">권한 수정</button>
-            </div>
-            ${mfaWarn}
-        `;
-        const numericId = parseInt(d.dbid, 10);
-        const safeName = d.name || '';
-        const safeRole = d.role || '';
-        document.getElementById('lockBtn')?.addEventListener('click', () => lockUser(numericId));
-        document.getElementById('unlockBtn')?.addEventListener('click', () => unlockUser(numericId));
-        document.getElementById('permBtn')?.addEventListener('click', () => openPermModal(numericId, safeName, safeRole));
-        document.getElementById('editPanel').scrollIntoView({behavior:'smooth'});
-    });
-});
+        document.getElementById('userInspName').textContent = d.name;
+        document.getElementById('userInspId').textContent = "Principal: " + d.id;
+        document.getElementById('userInspEmail').textContent = d.email;
+        document.getElementById('userInspRole').textContent = d.role;
+        document.getElementById('userInspLast').textContent = d.last;
+        document.getElementById('userInspStatus').textContent = d.status;
+        
+        const mfaSpan = document.getElementById('userInspMfa');
+        if (d.mfa === 'true') {
+            mfaSpan.innerHTML = '<span class="success">보호 중 (SECURED)</span>';
+        } else {
+            mfaSpan.innerHTML = '<span class="danger">취약함 (No MFA)</span>';
+        }
 
-function closeEdit() { document.getElementById('editPanel').style.display = 'none'; }
-
-function lockUser(dbId) {
-    if (!confirm('정말로 이 계정을 잠금 처리하시겠습니까?')) return;
-    fetch(`/api/users/${dbId}/lock`, { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-            showToast(data.message, data.success ? 'success' : 'error');
-            if (data.success) { closeEdit(); location.reload(); }
-        })
-        .catch(() => showToast('오류가 발생했습니다', 'error'));
-}
-
-function unlockUser(dbId) {
-    if (!confirm('이 계정의 잠금을 해제하시겠습니까?')) return;
-    fetch(`/api/users/${dbId}/unlock`, { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-            showToast(data.message, data.success ? 'success' : 'error');
-            if (data.success) { closeEdit(); location.reload(); }
-        })
-        .catch(() => showToast('오류가 발생했습니다', 'error'));
-}
-
-function openPermModal(dbId, name, currentRole) {
-    document.getElementById('permModalTitle').textContent = name + '의 역할 수정';
-    document.getElementById('permRoleSelect').value = currentRole;
-    document.getElementById('permSaveBtn').onclick = () => savePermissions(dbId);
-    document.getElementById('permModal').style.display = 'flex';
-}
-
-function closePermModal() { document.getElementById('permModal').style.display = 'none'; }
-
-function savePermissions(dbId) {
-    const role = document.getElementById('permRoleSelect').value;
-    fetch(`/api/users/${dbId}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role })
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.message, data.success ? 'success' : 'error');
-        if (data.success) { closePermModal(); location.reload(); }
-    })
-    .catch(() => showToast('오류가 발생했습니다', 'error'));
-}
-
-function openAddUserModal() {
-    document.getElementById('addUserModal').style.display = 'flex';
-    document.getElementById('newUsername').value = '';
-    document.getElementById('newName').value = '';
-    document.getElementById('newEmail').value = '';
-    document.getElementById('newPassword').value = '';
-}
-
-function closeAddUserModal() { document.getElementById('addUserModal').style.display = 'none'; }
-
-function submitAddUser() {
-    const body = {
-        username: document.getElementById('newUsername').value.trim(),
-        name:     document.getElementById('newName').value.trim(),
-        email:    document.getElementById('newEmail').value.trim(),
-        role:     document.getElementById('newRole').value,
-        password: document.getElementById('newPassword').value
-    };
-    fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.message, data.success ? 'success' : 'error');
-        if (data.success) { closeAddUserModal(); location.reload(); }
-    })
-    .catch(() => showToast('오류가 발생했습니다', 'error'));
-}
-
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-        closeAddUserModal();
-        closePermModal();
+        document.getElementById('userInspectorPanel').classList.add('active');
+        document.getElementById('detailBackdrop').classList.add('active');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     }
-});
+
+    function closeUserInspector() {
+        document.getElementById('userInspectorPanel').classList.remove('active');
+        document.getElementById('detailBackdrop').classList.remove('active');
+    }
+
+    function openSessionInspector() {
+        const container = document.getElementById('sessionDetailedList');
+        container.innerHTML = '';
+
+        if (activeSessions.length === 0) {
+            container.innerHTML = '<p class="dim" style="text-align:center; padding:20px;">검증된 외부 세션 데이터가 없습니다.</p>';
+        } else {
+            activeSessions.forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'premium-glass session-item-card';
+                item.style.padding = '16px';
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span class="accent fw-800">${s.user}</span>
+                        <span class="badge ${s.riskScore > 7 ? 'danger' : 'success'}" style="font-size:10px;">Risk: ${s.riskScore}</span>
+                    </div>
+                    <div class="dim mono" style="font-size:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                        <span><i data-lucide="map-pin" size="10"></i> ${s.location || 'Unknown'}</span>
+                        <span style="text-align:right;"><i data-lucide="layers" size="10"></i> ${s.ip}</span>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        document.getElementById('sessionInspectorPanel').classList.add('active');
+        document.getElementById('detailBackdrop').classList.add('active');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeSessionInspector() {
+        document.getElementById('sessionInspectorPanel').classList.remove('active');
+        document.getElementById('detailBackdrop').classList.remove('active');
+    }
+
+    function closeAllInspectors() {
+        closeSessionInspector();
+        closeUserInspector();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
 </script>
+
+<style>
+    .access-split-container { 
+        display: grid; 
+        grid-template-columns: 1fr 400px; 
+        gap: 24px; 
+        height: calc(100vh - 320px); 
+        min-height: 540px; 
+    }
+    .console-left { 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+    }
+    .console-right { 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+    }
+    
+    .avatar-sm { 
+        width: 32px; 
+        height: 32px; 
+        border-radius: 8px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+    }
+    
+    .badge-role { 
+        font-size: 10px; 
+        font-weight: 800; 
+        padding: 2px 8px; 
+        border-radius: 6px; 
+    }
+    .role-admin { 
+        color: var(--accent); 
+        background: rgba(0, 242, 255, 0.1); 
+        border: 1px solid var(--accent-glow); 
+    }
+    .role-analyst { 
+        color: var(--warning); 
+        background: rgba(255, 171, 0, 0.1); 
+        border: 1px solid rgba(255, 171, 0, 0.4); 
+    }
+    .role-viewer { 
+        color: var(--dim); 
+        background: rgba(255, 255, 255, 0.05); 
+        border: 1px solid rgba(255, 255, 255, 0.1); 
+    }
+
+    .session-feed-body { 
+        flex: 1; 
+        overflow-y: auto; 
+        padding: 0 24px; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 12px; 
+    }
+    .session-card { 
+        background: rgba(255,255,255,0.03); 
+        border: 1px solid rgba(255,255,255,0.05); 
+        padding: 16px; 
+        border-radius: 12px; 
+        position: relative; 
+    }
+    .session-card.risk-critical { 
+        border-color: rgba(239, 68, 68, 0.4); 
+        background: rgba(239, 68, 68, 0.05); 
+    }
+    .session-card.risk-critical::before { 
+        content: ''; 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        bottom: 0; 
+        width: 3px; 
+        background: var(--danger); 
+        box-shadow: 0 0 8px var(--danger); 
+    }
+    .session-card.risk-medium { 
+        border-color: rgba(255, 171, 0, 0.3); 
+    }
+
+    .info-item { 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+        color: var(--dim); 
+    }
+    
+    .btn-danger-sm { 
+        background: rgba(239, 68, 68, 0.1); 
+        border: 1px solid var(--danger); 
+        color: var(--danger); 
+        transition: 0.2s; 
+        cursor: pointer; 
+        font-size: 11px;
+        font-weight: 700;
+        padding: 6px 12px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-danger-sm:hover { 
+        background: var(--danger); 
+        color: #fff; 
+        box-shadow: 0 0 15px var(--danger); 
+    }
+
+    /* Inspector Sidebar */
+    .agent-inspector {
+        position: fixed;
+        top: 0;
+        right: -520px;
+        width: 480px;
+        height: 100vh;
+        background: rgba(10, 15, 25, 0.98);
+        backdrop-filter: blur(40px);
+        border-left: 1px solid var(--glass-border);
+        z-index: 10000;
+        transition: right 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        display: flex;
+        flex-direction: column;
+        box-shadow: -20px 0 80px rgba(0,0,0,0.8);
+    }
+    .agent-inspector.active {
+        right: 0;
+    }
+    
+    .inspector-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 9999;
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.4s;
+        backdrop-filter: blur(4px);
+    }
+    .inspector-backdrop.active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .pulse-alive {
+        animation: pulse 2s infinite;
+    }
+</style>
 
 </content>
 </body>

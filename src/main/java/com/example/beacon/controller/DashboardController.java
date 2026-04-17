@@ -66,11 +66,14 @@ public class DashboardController {
         stats.add(kpi("보안 점수",    "✓",  securityScore,   scoreLabel,        scoreColor, false));
         model.addAttribute("stats", stats);
 
-        List<Integer> hourlyData = securityEventService.getHourlyData();
-        model.addAttribute("hourlyData", hourlyData);
+        // 위협 분포 및 처리 분석 데이터 추가
+        model.addAttribute("hourlyData", securityEventService.getHourlyData());
+        model.addAttribute("threatDistribution", securityEventService.getThreatDistribution());
+        model.addAttribute("resolveRate", securityEventService.getResolveRate());
+        model.addAttribute("avgResponseTime", securityEventService.getAverageResponseTime());
 
         List<Map<String, Object>> recentEvents = securityEventService.getHighRiskEvents(5.0)
-                .stream().limit(5).map(this::toEventMap).collect(Collectors.toList());
+                .stream().limit(10).map(this::toEventMap).collect(Collectors.toList());
         model.addAttribute("recentEvents", recentEvents);
 
         return "pages/dashboard";
@@ -80,9 +83,14 @@ public class DashboardController {
     public String threats(Model model,
                           @RequestParam(defaultValue = "all") String severity,
                           @RequestParam(defaultValue = "") String search,
+                          @RequestParam(defaultValue = "all") String agentName,
+                          @RequestParam(defaultValue = "all") String source,
+                          @RequestParam(defaultValue = "false") boolean riskOnly,
+                          @RequestParam(defaultValue = "0") int page,
                           @RequestParam(required = false)
                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        LocalDate selectedDate = date != null ? date : LocalDate.now();
+        LocalDate selectedDate = date; // null 허용 (전체 조회를 위함)
+        int pageSize = 50; // 사용자 요청에 따라 50개씩
 
         model.addAttribute("page", "threats");
         model.addAttribute("pageTitle", "위협 / 이벤트 로그");
@@ -90,10 +98,25 @@ public class DashboardController {
         model.addAttribute("currentSeverity", severity);
         model.addAttribute("search", search);
         model.addAttribute("selectedDate", selectedDate);
+        model.addAttribute("currentAgent", agentName);
+        model.addAttribute("currentSource", source);
+        model.addAttribute("riskOnly", riskOnly);
 
-        List<Map<String, Object>> events = securityEventService.getEventsWithFiltersForDate(severity, search, selectedDate)
-                .stream().map(this::toEventMap).collect(Collectors.toList());
-        model.addAttribute("events", events);
+        // 에이전트 목록 (드롭다운 필터용)
+        List<String> agentList = agentService.getAllAgents().stream()
+                .map(Agent::getAgentName)
+                .collect(Collectors.toList());
+        model.addAttribute("agentList", agentList);
+
+        org.springframework.data.domain.Page<SecurityEvent> eventPage = securityEventService.getEventsWithFiltersPaged(
+                severity, search, agentName, source, riskOnly, selectedDate, 
+                org.springframework.data.domain.PageRequest.of(page, pageSize, org.springframework.data.domain.Sort.by("createdAt").descending())
+        );
+
+        model.addAttribute("events", eventPage.getContent().stream().map(this::toEventMap).collect(Collectors.toList()));
+        model.addAttribute("currentPage", page);
+        model.addAttribute("totalPages", eventPage.getTotalPages());
+        model.addAttribute("totalItems", eventPage.getTotalElements());
 
         return "pages/threats";
     }
@@ -119,45 +142,90 @@ public class DashboardController {
         // 차단 게이지: 최대 200건 기준
         int blockPct   = (int) Math.min(100, blockedLastHour * 100L / 200L);
 
-        model.addAttribute("bandwidthLastHour", bandwidth);
-        model.addAttribute("protocolStats", trafficAnalysisService.getProtocolStatistics());
-        model.addAttribute("metrics", List.of(
-                Map.of("label", "대역폭(1시간)", "value", bandwidth,       "color", "#00e5ff", "pct", bwPct),
-                Map.of("label", "활성 세션",    "value", activeSessions,   "color", "#06d6a0", "pct", sessionPct),
-                Map.of("label", "차단 이벤트",  "value", blockedLastHour,  "color", "#ff3d5a", "pct", blockPct),
-                Map.of("label", "평균 지연",    "value", avgLatency,       "color", "#ffd166", "pct", latencyPct)
-        ));
-
-        // 토폴로지 노드: 등록된 에이전트 기반, 없을 경우 안내 노드 표시
-        List<Agent> agentsForTopology = agentService.getAllAgents();
-        List<Map<String, Object>> nodes;
-        if (agentsForTopology.isEmpty()) {
-            nodes = List.of(Map.of("id", "SERVER-01", "label", "서버", "type", "server", "status", "ok"));
-        } else {
-            nodes = agentsForTopology.stream()
-                    .map(a -> {
-                        String nodeStatus = switch (a.getStatus() != null ? a.getStatus() : "offline") {
-                            case "online"  -> "ok";
-                            case "error"   -> "error";
-                            default        -> "warn";
-                        };
-                        String label = a.getAgentName() != null ? a.getAgentName()
-                                     : a.getHostname()  != null ? a.getHostname()
-                                     : "AG-" + a.getId();
-                        return Map.<String, Object>of(
-                                "id",     "AG-" + a.getId(),
-                                "label",  label,
-                                "type",   "server",
-                                "status", nodeStatus
-                        );
-                    })
-                    .collect(Collectors.toList());
+        // 1. 프로토콜 분석 데이터 가공 (방어 코드 추가)
+        Map<String, Object> rawProtocolStats = trafficAnalysisService.getProtocolStatistics();
+        long totalBytesValue = 0;
+        if (rawProtocolStats != null) {
+            totalBytesValue = rawProtocolStats.values().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .mapToLong(v -> {
+                        Object b = ((Map<String, Object>) v).get("bytes");
+                        return b != null ? ((Number) b).longValue() : 0L;
+                    }).sum();
         }
+        
+        final long totalBytes = totalBytesValue;
+        List<Map<String, Object>> protocolStatsList = new java.util.ArrayList<>();
+        if (rawProtocolStats != null) {
+            protocolStatsList = rawProtocolStats.entrySet().stream()
+                .map(entry -> {
+                    Map<String, Object> val = (Map<String, Object>) entry.getValue();
+                    Object bObj = val.get("bytes");
+                    long b = bObj != null ? ((Number) bObj).longValue() : 0L;
+                    int pct = totalBytes > 0 ? (int) (b * 100 / totalBytes) : 0;
+                    
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("name", entry.getKey() != null ? entry.getKey() : "UNKNOWN");
+                    map.put("bytes", b);
+                    map.put("pct", pct);
+                    return map;
+                }).sorted((a, b) -> Long.compare((long) b.get("bytes"), (long) a.get("bytes")))
+                .limit(5).collect(Collectors.toList());
+        }
+        
+        model.addAttribute("protocolStats", protocolStatsList);
+        model.addAttribute("bandwidthLastHour", bandwidth);
+        
+        List<Map<String, Object>> displayMetrics = new java.util.ArrayList<>();
+        displayMetrics.add(Map.of("label", "대역폭(1시간)", "value", bandwidth, "color", "#00e5ff", "pct", bwPct));
+        displayMetrics.add(Map.of("label", "활성 세션", "value", activeSessions, "color", "#06d6a0", "pct", sessionPct));
+        displayMetrics.add(Map.of("label", "차단 이벤트", "value", blockedLastHour, "color", "#ff3d5a", "pct", blockPct));
+        displayMetrics.add(Map.of("label", "평균 지연", "value", avgLatency, "color", "#ffd166", "pct", latencyPct));
+        model.addAttribute("metrics", displayMetrics);
+
+        // 2. 토폴로지 노드: 등록된 에이전트 기반
+        List<Agent> agents = agentService.getAllAgents();
+        List<Map<String, Object>> nodes = agents.stream()
+                .map(a -> {
+                    String nodeStatus = switch (a.getStatus() != null ? a.getStatus() : "offline") {
+                        case "online"  -> "ok";
+                        case "error"   -> "error";
+                        default        -> "warn";
+                    };
+                    return Map.<String, Object>of(
+                            "id",     "AG-" + a.getId(),
+                            "label",  a.getAgentName() != null ? a.getAgentName() : "AG-" + a.getId(),
+                            "type",   "server",
+                            "status", nodeStatus,
+                            "ip",     a.getIpAddress()
+                    );
+                }).collect(Collectors.toList());
         model.addAttribute("nodes", nodes);
 
-        // 인터페이스: 서버의 실제 NIC 목록
-        List<Map<String, Object>> ifaces = networkStatsService.getNetworkInterfaces();
-        model.addAttribute("interfaces", ifaces);
+        // 3. 인터페이스: 에이전트의 실제 하드웨어 네트워크 정보 (파이썬 에이전트 수집본 JSON 파싱)
+        List<Map<String, Object>> agentInterfaces = agents.stream()
+                .map(a -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("name", a.getAgentName() != null ? a.getAgentName() : "Unknown");
+                    map.put("ip", a.getIpAddress() != null ? a.getIpAddress() : "-");
+                    map.put("status", a.getStatus() != null ? a.getStatus() : "offline");
+                    map.put("trafficCount", a.getTotalTrafficLogs() != null ? a.getTotalTrafficLogs() : 0L);
+                    
+                    // JSON 변환기로 metadata에 들어있는 interfaces 획득
+                    List<Map<String, Object>> hwNics = new java.util.ArrayList<>();
+                    if (a.getMetadata() != null) {
+                        try {
+                            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                            Map<String, Object> metaMap = mapper.readValue(a.getMetadata(), Map.class);
+                            if (metaMap.containsKey("interfaces")) {
+                                hwNics = (List<Map<String, Object>>) metaMap.get("interfaces");
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                    map.put("hwInterfaces", hwNics);
+                    return map;
+                }).collect(Collectors.toList());
+        model.addAttribute("agentInterfaces", agentInterfaces);
 
         return "pages/network";
     }
@@ -196,11 +264,10 @@ public class DashboardController {
                 .stream().map(this::toRuleMap).collect(Collectors.toList());
         model.addAttribute("rules", rules);
 
-        model.addAttribute("policies", List.of(
-                Map.of("title", "기본 차단 정책", "desc", "허용되지 않은 외부 포트 접근 차단", "color", "#ff3d5a"),
-                Map.of("title", "내부망 보호", "desc", "DMZ → 내부망 접근 최소화", "color", "#00e5ff"),
-                Map.of("title", "관리자 접근", "desc", "관리 포트는 화이트리스트만 허용", "color", "#ffd166")
-        ));
+        // 실시간 차단 이력 데이터 추가
+        List<Map<String, Object>> recentBlocked = securityEventService.getRecentResolved()
+                .stream().limit(10).map(this::toEventMap).collect(Collectors.toList());
+        model.addAttribute("recentBlocked", recentBlocked);
 
         return "pages/firewall";
     }
@@ -237,6 +304,13 @@ public class DashboardController {
         model.addAttribute("monthlyScores", securityEventService.getMonthlyScores(12));
 
         return "pages/reports";
+    }
+
+    @GetMapping("/location")
+    public String location(Model model) {
+        model.addAttribute("page", "location");
+        model.addAttribute("pageTitle", "위치 추적");
+        return "pages/location";
     }
 
     @GetMapping("/login")
@@ -299,7 +373,9 @@ public class DashboardController {
         m.put("dbId", e.getId());
         m.put("id", "EVT-" + e.getId());
         m.put("type", e.getEventType() != null ? e.getEventType() : "Unknown");
-        m.put("ip", e.getSourceIp() != null ? e.getSourceIp() : "N/A");
+        m.put("sourceIp", e.getSourceIp() != null ? e.getSourceIp() : "N/A");
+        m.put("destinationIp", e.getDestinationIp() != null ? e.getDestinationIp() : "Internal Node");
+        m.put("ip", e.getSourceIp() != null ? e.getSourceIp() : "N/A"); // backward compatibility
         m.put("protocol", e.getProtocol() != null ? e.getProtocol() : "N/A");
         m.put("port", e.getPort() != null ? String.valueOf(e.getPort()) : "N/A");
         m.put("location", e.getLocation() != null ? e.getLocation() : "Unknown");
@@ -311,7 +387,18 @@ public class DashboardController {
                 ? e.getCreatedAt().toString().replace("T", " ").substring(0, Math.min(16, e.getCreatedAt().toString().length()))
                 : "";
         m.put("time", time);
-        m.put("source", e.getSource() != null ? e.getSource().name() : null);
+        m.put("source", e.getSource() != null ? e.getSource().name() : "AGENT");
+        m.put("agentName", e.getAgentName() != null ? e.getAgentName() : "N/A");
+        
+        // Ensure metadata is a valid JSON string for frontend rendering. If it's pure string but not json, wrap it.
+        String meta = e.getMetadata() != null ? e.getMetadata() : "{}";
+        if(!meta.trim().startsWith("{") && !meta.trim().startsWith("[")) {
+            meta = "{\"raw_data\":\"" + meta.replace("\"", "\\\"").replace("\n", " ") + "\"}";
+        }
+        m.put("metadata", meta);
+        
+        m.put("description", e.getDescription() != null ? e.getDescription() : "");
+        m.put("riskScore", e.getRiskScore() != null ? e.getRiskScore() : 0.0);
         return m;
     }
 
@@ -433,6 +520,7 @@ public class DashboardController {
                 ? a.getLastFirewallStatusAt().format(formatter)
                 : "—";
         m.put("lastFirewallStatusAt", fwAt);
+        m.put("metadata", a.getMetadata() != null ? a.getMetadata() : "{}");
         
         return m;
     }

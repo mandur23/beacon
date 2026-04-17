@@ -45,6 +45,23 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
            "(:severity = 'all' OR e.severity = :severity) AND " +
            "(:search = '' OR LOWER(e.sourceIp) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "LOWER(e.eventType) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:agentName = 'all' OR e.agentName = :agentName) AND " +
+           "(:source = 'all' OR CAST(e.source AS string) = :source) AND " +
+           "(:riskOnly = false OR (e.severity IN ('critical', 'high') OR e.riskScore >= 7.0)) AND " +
+           "(:start IS NULL OR e.createdAt >= :start) AND (:end IS NULL OR e.createdAt < :end)")
+    Page<SecurityEvent> findWithAdvancedFilters(@Param("severity") String severity,
+                                                @Param("search") String search,
+                                                @Param("agentName") String agentName,
+                                                @Param("source") String source,
+                                                @Param("riskOnly") boolean riskOnly,
+                                                @Param("start") LocalDateTime start,
+                                                @Param("end") LocalDateTime end,
+                                                Pageable pageable);
+
+    @Query("SELECT e FROM SecurityEvent e WHERE " +
+           "(:severity = 'all' OR e.severity = :severity) AND " +
+           "(:search = '' OR LOWER(e.sourceIp) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(e.eventType) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "e.createdAt >= :start AND e.createdAt < :end " +
            "ORDER BY e.createdAt DESC")
     List<SecurityEvent> findWithFiltersAndDateRange(@Param("severity") String severity,
@@ -53,7 +70,7 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
                                                     @Param("end") LocalDateTime end);
 
     @Query("SELECT e.severity, COUNT(e) FROM SecurityEvent e WHERE " +
-           "e.createdAt >= :start AND e.createdAt < :end GROUP BY e.severity")
+           "(:start IS NULL OR e.createdAt >= :start) AND (:end IS NULL OR e.createdAt < :end) GROUP BY e.severity")
     List<Object[]> countBySeverityInDateRange(@Param("start") LocalDateTime start,
                                               @Param("end") LocalDateTime end);
 

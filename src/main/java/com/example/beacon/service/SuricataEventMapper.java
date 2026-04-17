@@ -2,7 +2,9 @@ package com.example.beacon.service;
 
 import com.example.beacon.entity.EventSource;
 import com.example.beacon.entity.SecurityEvent;
+import com.example.beacon.repository.AgentRepository;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
@@ -12,7 +14,10 @@ import java.util.Set;
  * SyslogEventHandler와 EveJsonFileWatcherService 양쪽에서 재사용한다.
  */
 @Component
+@RequiredArgsConstructor
 public class SuricataEventMapper {
+
+    private final AgentRepository agentRepository;
 
     public static final Set<String> SKIP_EVENT_TYPES = Set.of(
             "stats", "flow", "netflow", "fileinfo", "packetinfo"
@@ -36,6 +41,11 @@ public class SuricataEventMapper {
         String description = buildDescription(eventType, signature, category);
         String status = "alert".equalsIgnoreCase(eventType) ? "차단됨" : "탐지됨";
 
+        // IP 기반 에이전트 자동 매핑
+        String agentName = agentRepository.findByIpAddress(srcIp)
+                .map(a -> a.getAgentName())
+                .orElse("Network-IDS"); // 에이전트가 없으면 기본값
+
         return SecurityEvent.builder()
                 .eventType(truncate(eventType.isEmpty() ? "unknown" : eventType, 100))
                 .severity(severity)
@@ -45,6 +55,7 @@ public class SuricataEventMapper {
                 .port(destPort)
                 .status(truncate(status, 50))
                 .description(description)
+                .agentName(truncate(agentName, 100))
                 .metadata(rawJson)
                 .blocked("alert".equalsIgnoreCase(eventType))
                 .riskScore(riskScore)

@@ -17,4 +17,5 @@ public class TrafficLogRequest {
     private Long packetsTransferred;
     private Integer duration;
     private String rawData;
+    private String agentName;
 }

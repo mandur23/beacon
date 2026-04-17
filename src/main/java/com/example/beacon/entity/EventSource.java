@@ -11,6 +11,8 @@ public enum EventSource {
     SYSLOG,
     /** API를 통해 에이전트가 전송한 이벤트 */
     AGENT,
+    /** Wazuh HIDS로부터 수집된 이벤트 */
+    WAZUH,
     /** 관리자가 위협 화면에서 수동으로 처리한 이벤트 */
     MANUAL
 }

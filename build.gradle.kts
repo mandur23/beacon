@@ -42,7 +42,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-integration")
     implementation("org.springframework.integration:spring-integration-ip")
-    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")

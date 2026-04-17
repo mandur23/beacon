@@ -23,6 +23,8 @@ public class SecurityEventCreateRequest {
     @NotBlank
     private String sourceIp;
 
+    private String agentName;
+
     private String destinationIp;
 
     private String location;
@@ -40,6 +42,20 @@ public class SecurityEventCreateRequest {
     private Double riskScore = 0.0;
 
     public SecurityEvent toEntity() {
+        EventSource resolvedSource = EventSource.AGENT;
+        
+        // eventType 기반 판별
+        if ("WAZUH_ALERT".equalsIgnoreCase(eventType)) {
+            resolvedSource = EventSource.WAZUH;
+        } else if (eventType != null && eventType.toUpperCase().startsWith("IDS_")) {
+            resolvedSource = EventSource.SURICATA;
+        }
+        
+        // 요약 정보(description/summary)에 [Wazuh] 패턴이 있는 경우 보정
+        if (description != null && description.contains("[Wazuh]")) {
+            resolvedSource = EventSource.WAZUH;
+        }
+
         return SecurityEvent.builder()
                 .eventType(eventType)
                 .severity(severity)
@@ -50,10 +66,11 @@ public class SecurityEventCreateRequest {
                 .port(port)
                 .status("pending")
                 .description(description)
+                .agentName(agentName)
                 .metadata(metadata)
                 .blocked(false)
                 .riskScore(riskScore != null ? riskScore : 0.0)
-                .source(EventSource.AGENT)
+                .source(resolvedSource)
                 .build();
     }
 }

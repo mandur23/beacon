@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "traffic_logs", indexes = {
     @Index(name = "idx_timestamp", columnList = "timestamp"),
     @Index(name = "idx_source_ip", columnList = "sourceIp"),
-    @Index(name = "idx_anomaly", columnList = "isAnomaly")
+    @Index(name = "idx_anomaly", columnList = "isAnomaly"),
+    @Index(name = "idx_agent_name", columnList = "agentName")
 })
 @Data
 @NoArgsConstructor
@@ -62,6 +63,9 @@ public class TrafficLog {
     
     @Column(columnDefinition = "JSON")
     private String rawData;
+    
+    @Column(length = 100)
+    private String agentName;
     
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

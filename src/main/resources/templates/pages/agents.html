@@ -4,202 +4,359 @@
 <body>
 <content>
 
-<div class="grid-3 mb16">
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">전체 에이전트</div>
-        <div class="stat-value accent" th:text="${agentStats.total}"></div>
+<div class="grid-metrics mb24">
+    <div class="premium-glass kpi-box">
+        <div class="metric-header"><span class="metric-label">전체 자산</span><i data-lucide="monitor"></i></div>
+        <div class="metric-val" th:text="${agentStats.total}">0</div>
+        <div class="metric-sub">관제 대상 엔드포인트 수</div>
     </div>
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">온라인</div>
-        <div class="stat-value green" th:text="${agentStats.online}"></div>
+    <div class="premium-glass kpi-box">
+        <div class="metric-header"><span class="metric-label">온라인</span><i data-lucide="zap"></i></div>
+        <div class="metric-val" th:text="${agentStats.online}">0</div>
+        <div class="metric-sub">정상 통신 중인 에이전트</div>
     </div>
-    <div class="card" style="padding:16px 20px">
-        <div class="stat-label mb8">오프라인</div>
-        <div class="stat-value red" th:text="${agentStats.offline}"></div>
+    <div class="premium-glass kpi-box">
+        <div class="metric-header"><span class="metric-label">오프라인</span><i data-lucide="alert-triangle"></i></div>
+        <div class="metric-val" th:text="${agentStats.offline}">0</div>
+        <div class="metric-sub">확인이 필요한 단말</div>
     </div>
 </div>
 
-<div class="card">
+<div class="premium-glass">
     <div class="card-header">
         <div>
-            <div class="card-title">에이전트 목록</div>
-            <div class="card-sub">모니터링 대상 PC 관리</div>
+            <div class="card-title glow-text">에이전트 관리 콘솔</div>
+            <div class="card-sub">에이전트 상태, 이벤트 수, 트래픽 수, 마지막 통신 시점을 한눈에 확인합니다.</div>
         </div>
-        <div style="display:flex;gap:8px">
-            <button class="btn-sm accent" onclick="refreshStatus()">🔄 새로고침</button>
-        </div>
+        <button class="btn-accent" onclick="location.reload()"><i data-lucide="refresh-cw" size="14"></i> 새로고침</button>
     </div>
-    <div class="table-wrap">
-        <table class="data-table">
+
+    <div class="table-container">
+        <table class="p-table cyber-table">
             <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>에이전트명</th>
-                    <th>호스트명</th>
-                    <th>IP 주소</th>
-                    <th>OS</th>
-                    <th>사용자</th>
-                    <th>버전</th>
-                    <th>상태</th>
-                    <th>마지막 연결</th>
-                    <th>방화벽 rev</th>
-                    <th>방화벽 상태 시각</th>
-                    <th>소유 userId</th>
-                    <th>이벤트</th>
-                    <th>트래픽</th>
-                    <th>작업</th>
-                </tr>
+            <tr>
+                <th>자산 ID</th>
+                <th>에이전트 / 호스트</th>
+                <th>IP / 사용자</th>
+                <th>운영체제</th>
+                <th>상태</th>
+                <th>이벤트</th>
+                <th>마지막 통신</th>
+                <th>상세</th>
+            </tr>
             </thead>
             <tbody>
-                <tr th:each="a : ${agents}" class="agent-row"
-                    th:data-dbid="${a.dbId}"
-                    th:data-id="${a.id}"
-                    th:data-agentname="${a.agentName}"
-                    th:data-hostname="${a.hostname}"
-                    th:data-ipaddress="${a.ipAddress}"
-                    th:data-ostype="${a.osType}"
-                    th:data-osversion="${a.osVersion}"
-                    th:data-agentversion="${a.agentVersion}"
-                    th:data-username="${a.username}"
-                    th:data-status="${a.status}"
-                    th:data-statuslabel="${a.statusLabel}"
-                    th:data-statuscolor="${a.statusColor}"
-                    th:data-lastheartbeat="${a.lastHeartbeat}"
-                    th:data-registeredat="${a.registeredAt}"
-                    th:data-totalevents="${a.totalEvents}"
-                    th:data-totaltrafficlogs="${a.totalTrafficLogs}"
-                    th:data-owneruserid="${a.ownerUserId}"
-                    th:data-lastfirewallrevision="${a.lastFirewallAppliedRevision}"
-                    th:data-lastfirewallstatusat="${a.lastFirewallStatusAt}">
-                    <td class="mono accent" th:text="${a.id}"></td>
-                    <td style="font-weight:600" th:text="${a.agentName}"></td>
-                    <td class="dim" th:text="${a.hostname}"></td>
-                    <td class="mono dim" th:text="${a.ipAddress}"></td>
-                    <td>
-                        <div style="font-size:11px">
-                            <div th:text="${a.osType}"></div>
-                            <div class="muted" th:text="${a.osVersion}"></div>
-                        </div>
-                    </td>
-                    <td class="dim" th:text="${a.username}"></td>
-                    <td class="mono dim" style="font-size:10px" th:text="${a.agentVersion}"></td>
-                    <td>
-                        <span style="display:flex;align-items:center;gap:5px;font-size:10px"
-                              th:style="'display:flex;align-items:center;gap:5px;font-size:10px;color:' + ${a.statusColor}">
-                            <span class="dot" 
-                                  th:style="'background:' + ${a.statusColor}"
-                                  th:classappend="${a.status == 'online'} ? 'blink' : ''"></span>
-                            <span th:text="${a.statusLabel}"></span>
-                        </span>
-                    </td>
-                    <td class="muted" style="font-size:10px" th:text="${a.lastHeartbeat}"></td>
-                    <td class="mono dim" style="font-size:10px" th:text="${a.lastFirewallAppliedRevision != null ? a.lastFirewallAppliedRevision : '—'}"></td>
-                    <td class="muted" style="font-size:10px" th:text="${a.lastFirewallStatusAt}"></td>
-                    <td class="mono dim" style="font-size:10px" th:text="${a.ownerUserId != null ? a.ownerUserId : '—'}"></td>
-                    <td class="accent" th:text="${a.totalEvents}"></td>
-                    <td class="accent" th:text="${a.totalTrafficLogs}"></td>
-                    <td>
-                        <button class="btn-sm dim detail-btn" th:onclick="'showAgentDetail(' + ${a.dbId} + ')'">상세</button>
-                    </td>
-                </tr>
-                <tr th:if="${#lists.isEmpty(agents)}">
-                    <td colspan="15" style="text-align:center;padding:40px;color:#6b7280">
-                        등록된 에이전트가 없습니다<br/>
-                        <small class="muted">BeaconGuardian을 실행하면 자동으로 등록됩니다</small>
-                    </td>
-                </tr>
+            <tr th:each="a : ${agents}" class="agent-row"
+                th:data-dbid="${a.dbId}"
+                th:data-name="${a.agentName}"
+                th:data-host="${a.hostname}"
+                th:data-ip="${a.ipAddress}"
+                th:data-os="${a.osType}"
+                th:data-osver="${a.osVersion}"
+                th:data-aver="${a.agentVersion}"
+                th:data-user="${a.username}"
+                th:data-status="${a.status}"
+                th:data-heartbeat="${a.lastHeartbeat}"
+                th:data-events="${a.totalEvents}"
+                th:data-traffic="${a.totalTrafficLogs}"
+                th:data-fw="${a['lastFirewallStatusAt']}"
+                th:data-metadata="${a['metadata']}">
+                <td class="mono accent" th:text="${a.id}"></td>
+                <td>
+                    <div style="font-weight:600; color:#fff;" th:text="${a.agentName}"></div>
+                    <div class="dim" style="font-size:10px;" th:text="${a.hostname}"></div>
+                </td>
+                <td class="mono">
+                    <div th:text="${a.ipAddress}"></div>
+                    <div class="muted" style="font-size:10px;">사용자: <span th:text="${a.username}"></span></div>
+                </td>
+                <td th:text="${a.osType} + ' ' + ${a.osVersion}">OS</td>
+                <td>
+                    <span class="badge" th:style="'color:' + ${a.statusColor} + '; background:' + ${a.statusColor} + '1a; border:1px solid ' + ${a.statusColor} + '44;'">
+                        <span class="badge-dot" th:style="'background:' + ${a.statusColor}"></span>
+                        <th:block th:text="${a.statusLabel}"></th:block>
+                    </span>
+                </td>
+                <td class="mono">
+                    <div>탐지 <span th:text="${a.totalEvents}">0</span></div>
+                    <div class="dim" style="font-size:10px;">트래픽 <span th:text="${a.totalTrafficLogs}">0</span></div>
+                </td>
+                <td class="mono dim" style="font-size:11px;" th:text="${a.lastHeartbeat}"></td>
+                <td><button class="icon-btn" th:onclick="'openInspector(' + ${a.dbId} + ')'"><i data-lucide="chevron-right"></i></button></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(agents)}">
+                <td colspan="8" style="text-align:center; padding:48px; color:var(--dim);">등록된 에이전트가 없습니다.</td>
+            </tr>
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- 상세 패널 -->
-<div id="detailPanel" class="card" style="display:none;margin-top:14px">
-    <div class="card-header">
-        <div class="card-title">에이전트 상세 정보</div>
-        <button onclick="closeDetail()" class="btn-icon">×</button>
+<div id="inspectorBackdrop" class="inspector-backdrop" onclick="closeInspector()"></div>
+<div id="agentInspector" class="agent-inspector">
+    <div class="inspector-header">
+        <div>
+            <h3 id="inspAgentName" style="color:#fff; font-family:var(--font-title);">Agent</h3>
+            <p id="inspHost" class="dim" style="font-size:12px;">hostname</p>
+        </div>
+        <button class="icon-btn" onclick="closeInspector()"><i data-lucide="x"></i></button>
     </div>
-    <div style="padding:16px 20px">
-        <div id="detailContent"></div>
+    <div class="inspector-body">
+        <div class="inspector-section">
+            <h4 class="inspector-label">기본 정보</h4>
+            <div class="inspector-grid">
+                <div class="info-item"><label>ID</label><span id="inspId" class="mono accent"></span></div>
+                <div class="info-item"><label>IPv4</label><span id="inspIp" class="mono"></span></div>
+                <div class="info-item"><label>운영체제</label><span id="inspOsVer"></span></div>
+                <div class="info-item"><label>사용자</label><span id="inspUser"></span></div>
+                <div class="info-item"><label>에이전트 버전</label><span id="inspAVer" class="badge"></span></div>
+                <div class="info-item"><label>마지막 통신</label><span id="inspHb" class="mono dim"></span></div>
+            </div>
+        </div>
+        <div class="inspector-section">
+            <h4 class="inspector-label">보안 상태</h4>
+            <div class="inspector-grid">
+                <div class="info-item"><label>탐지 이벤트</label><span id="inspEvents" class="mono danger"></span></div>
+                <div class="info-item"><label>트래픽 로그</label><span id="inspTraffic" class="mono accent"></span></div>
+                <div class="info-item"><label>방화벽 적용 시각</label><span id="inspFwAt" class="mono dim"></span></div>
+                <div class="info-item"><label>위치 정보</label><span id="inspLoc">알 수 없음</span></div>
+            </div>
+        </div>
+        <div class="inspector-section">
+            <h4 class="inspector-label">활발하게 가동 중인 보호 엔진 (Active Monitors)</h4>
+            <div id="inspActiveMonitors" class="engine-grid">
+                <!-- 활성 모니터 뱃지들이 렌더링 됩니다 -->
+            </div>
+        </div>
+        <div id="inspectorBiometricSection" class="inspector-section" style="display:none;">
+            <h4 class="inspector-label">지능형 분석 엔진 (Machine Learning)</h4>
+            <div class="inspector-grid">
+                <div class="info-item"><label>동작 모드</label><span id="inspBioMode" class="badge"></span></div>
+                <div class="info-item"><label>데이터 수집 샘플</label><span id="inspBioSamples" class="mono"></span></div>
+                <div style="padding-top:8px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:11px;">
+                        <span class="dim">패턴 분석 진행률</span>
+                        <span id="inspBioProgressTxt" class="accent mono" style="font-weight:700;">0%</span>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+                        <div id="inspBioProgressBar" style="height:100%; width:0%; background:linear-gradient(90deg, #00f2ff, var(--accent)); transition:width 0.5s;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="inspector-footer">
+        <button class="btn-glass" style="width:100%;" onclick="closeInspector()">닫기</button>
     </div>
 </div>
 
-<script th:inline="none">
-function showAgentDetail(dbId) {
+<script>
+function openInspector(dbId) {
     const row = document.querySelector(`.agent-row[data-dbid="${dbId}"]`);
+    if (!row) return;
     const d = row.dataset;
+    document.getElementById('inspAgentName').textContent = d.name;
+    document.getElementById('inspHost').textContent = d.host;
+    document.getElementById('inspId').textContent = "AG-" + d.dbid;
+    document.getElementById('inspIp').textContent = d.ip;
+    document.getElementById('inspOsVer').textContent = `${d.os} (${d.osver})`;
+    document.getElementById('inspUser').textContent = d.user;
+    document.getElementById('inspAVer').textContent = "v" + d.aver;
+    document.getElementById('inspEvents').textContent = d.events;
+    document.getElementById('inspTraffic').textContent = d.traffic;
+    document.getElementById('inspFwAt').textContent = d.fw || '-';
+    document.getElementById('inspHb').textContent = d.heartbeat || '-';
+    document.getElementById('inspLoc').textContent = '알 수 없음';
     
-    document.getElementById('detailPanel').style.display = 'block';
-    
-    const statusIcon = d.status === 'online' ? '🟢' : '🔴';
-    
-    document.getElementById('detailContent').innerHTML = `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-            <div class="card" style="padding:12px;background:#0d1520">
-                <div class="muted mb8">에이전트 ID</div>
-                <div class="mono accent" style="font-size:14px">${d.id}</div>
-            </div>
-            <div class="card" style="padding:12px;background:#0d1520">
-                <div class="muted mb8">상태</div>
-                <div style="color:${d.statuscolor};font-weight:600">${statusIcon} ${d.statuslabel}</div>
-            </div>
-        </div>
-        
-        <div class="detail-row"><span class="dim">에이전트명</span><span class="mono">${d.agentname}</span></div>
-        <div class="detail-row"><span class="dim">호스트명</span><span class="mono">${d.hostname}</span></div>
-        <div class="detail-row"><span class="dim">IP 주소</span><span class="mono accent">${d.ipaddress}</span></div>
-        <div class="detail-row"><span class="dim">운영체제</span><span>${d.ostype} ${d.osversion}</span></div>
-        <div class="detail-row"><span class="dim">사용자</span><span>${d.username}</span></div>
-        <div class="detail-row"><span class="dim">에이전트 버전</span><span class="mono">${d.agentversion}</span></div>
-        <div class="detail-row"><span class="dim">등록일시</span><span>${d.registeredat}</span></div>
-        <div class="detail-row"><span class="dim">마지막 연결</span><span>${d.lastheartbeat}</span></div>
-        <div class="detail-row"><span class="dim">소유 userId</span><span class="mono">${d.owneruserid || '—'}</span></div>
-        <div class="detail-row"><span class="dim">방화벽 적용 revision</span><span class="mono">${d.lastfirewallrevision || '—'}</span></div>
-        <div class="detail-row"><span class="dim">방화벽 상태 보고 시각</span><span>${d.lastfirewallstatusat || '—'}</span></div>
-        <div class="detail-row"><span class="dim">총 이벤트</span><span class="accent">${d.totalevents}건</span></div>
-        <div class="detail-row"><span class="dim">총 트래픽 로그</span><span class="accent">${d.totaltrafficlogs}건</span></div>
-        
-        <div class="detail-actions" style="margin-top:16px">
-            <button class="btn-danger" onclick="deleteAgent(${dbId})">에이전트 삭제</button>
-            ${d.status === 'offline' ? '<button class="btn-sm dim" disabled>오프라인 상태</button>' : ''}
-        </div>
-        
-        ${d.status === 'offline' ? '<div class="alert alert-warn" style="margin-top:12px">⚠ 에이전트가 1분 이상 응답하지 않습니다</div>' : ''}
-    `;
-    
-    document.getElementById('detailPanel').scrollIntoView({behavior:'smooth'});
-}
+    // 숨기기 초기화
+    document.getElementById('inspectorBiometricSection').style.display = 'none';
 
-function closeDetail() {
-    document.getElementById('detailPanel').style.display = 'none';
-}
+    if (d.metadata && d.metadata !== 'null') {
+        try {
+            const meta = JSON.parse(d.metadata);
+            if (meta.location) document.getElementById('inspLoc').textContent = meta.location;
+            
+            const isOnline = (d.status || '').toLowerCase() === 'online';
 
-function deleteAgent(dbId) {
-    if (!confirm('정말로 이 에이전트를 삭제하시겠습니까?\n\n에이전트를 다시 실행하면 자동으로 재등록됩니다.')) return;
-    
-    fetch(`/api/agents/${dbId}`, { method: 'DELETE' })
-        .then(r => r.json())
-        .then(data => {
-            showToast(data.message, data.success ? 'success' : 'error');
-            if (data.success) {
-                closeDetail();
-                location.reload();
+            // 모니터링 현황 동적 렌더링
+            if (meta.active_monitors) {
+                const monContainer = document.getElementById('inspActiveMonitors');
+                const mConf = [
+                    { key: 'network', icon: 'zap', label: '네트워크 감시' },
+                    { key: 'file', icon: 'file-search', label: '파일 제어(DLP)' },
+                    { key: 'process', icon: 'cpu', label: '프로세스 제어' },
+                    { key: 'usb', icon: 'usb', label: '물리 매체 통제' },
+                    { key: 'biometric', icon: 'fingerprint', label: '생체/행위 분석' },
+                    { key: 'suricata', icon: 'shield-alert', label: '네트워크 IDS' },
+                    { key: 'wazuh', icon: 'server', label: '호스트 IDS' },
+                    { key: 'auth', icon: 'key', label: '인증결함 추적' },
+                    { key: 'firewall_sync', icon: 'shield-check', label: '방화벽 연동' }
+                ];
+                let monHtml = '';
+                mConf.forEach(c => {
+                    const isActive = meta.active_monitors[c.key];
+                    if (isActive !== undefined) {
+                        // 에이전트가 오프라인이면 마지막 상태와 무관하게 동작 중단(회색)으로 처리
+                        const actuallyRunning = isOnline && isActive;
+                        const cls = actuallyRunning ? 'engine-badge active' : 'engine-badge';
+                        const iconColor = actuallyRunning ? '#00f2ff' : 'var(--dim)';
+                        monHtml += `<div class="${cls}"><i data-lucide="${c.icon}"></i> ${c.label}</div>`;
+                    }
+                });
+                monContainer.innerHTML = monHtml || '<div class="dim">엔진 정보 없음</div>';
+                
+                if (!isOnline && monHtml) {
+                    monContainer.innerHTML += '<div style="flex-basis:100%; margin-top:6px; font-size:11px; color:var(--danger); display:flex; align-items:center; gap:4px;"><i data-lucide="alert-circle" style="width:12px; height:12px;"></i> 에이전트 오프라인 - 모든 상태 분석 중단됨</div>';
+                }
             }
-        })
-        .catch(() => showToast('오류가 발생했습니다', 'error'));
-}
 
-function refreshStatus() {
-    showToast('에이전트 상태를 갱신합니다...', 'info');
-    location.reload();
+            if (meta.biometric) {
+                document.getElementById('inspectorBiometricSection').style.display = 'flex';
+                
+                const bio = meta.biometric;
+                const isTraining = bio.mode === 'TRAINING';
+                const statusSpan = document.getElementById('inspBioMode');
+                
+                if (!isOnline) {
+                    statusSpan.textContent = '수집 중단 (Offline)';
+                    statusSpan.className = 'badge danger';
+                } else {
+                    statusSpan.textContent = isTraining ? '초기 학습/분석 중 (Training)' : '가드 온 (Guarding)';
+                    statusSpan.className = 'badge ' + (isTraining ? 'warning pulse' : 'success');
+                }
+                
+                document.getElementById('inspBioSamples').textContent = `${bio.sample_count || 0} / ${bio.target_samples || 0}`;
+                document.getElementById('inspBioProgressTxt').textContent = `${bio.progress || 0}%`;
+                document.getElementById('inspBioProgressBar').style.width = `${bio.progress || 0}%`;
+                
+                // 오프라인일 경우 프로그레스 바 색상을 회색으로 오버라이드
+                if (!isOnline) {
+                    document.getElementById('inspBioProgressBar').style.background = 'rgba(255,255,255,0.2)';
+                } else {
+                    document.getElementById('inspBioProgressBar').style.background = 'linear-gradient(90deg, #00f2ff, var(--accent))';
+                }
+            }
+        } catch (e) {}
+    }
+    document.getElementById('agentInspector').classList.add('active');
+    document.getElementById('inspectorBackdrop').classList.add('active');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
-
-// 자동 새로고침 (30초마다)
-setInterval(() => {
-    console.log('Auto-refreshing agent status...');
-    location.reload();
-}, 30000);
+function closeInspector() {
+    document.getElementById('agentInspector').classList.remove('active');
+    document.getElementById('inspectorBackdrop').classList.remove('active');
+}
 </script>
+
+<style>
+    .agent-inspector { 
+        position: fixed; 
+        top: 0; 
+        right: -480px; 
+        width: 440px; 
+        height: 100vh; 
+        background: rgba(10,15,25,.95); 
+        backdrop-filter: blur(30px); 
+        border-left: 1px solid var(--glass-border); 
+        z-index: 1000; 
+        transition: right .4s cubic-bezier(.19,1,.22,1); 
+        display: flex; 
+        flex-direction: column; 
+        box-shadow: -20px 0 50px rgba(0,0,0,.5); 
+    }
+    .agent-inspector.active { 
+        right: 0; 
+    }
+    .inspector-backdrop { 
+        position: fixed; 
+        inset: 0; 
+        background: rgba(0,0,0,.5); 
+        z-index: 999; 
+        opacity: 0; 
+        pointer-events: none; 
+        transition: .3s; 
+    }
+    .inspector-backdrop.active { 
+        opacity: 1; 
+        pointer-events: auto; 
+    }
+    .inspector-header { 
+        padding: 32px; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        border-bottom: 1px solid var(--glass-border); 
+    }
+    .inspector-body { 
+        flex: 1; 
+        overflow-y: auto; 
+        padding: 32px; 
+        display: flex; 
+        flex-direction: column; 
+        gap: 24px; 
+    }
+    .inspector-section { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 16px; 
+    }
+    .inspector-label { 
+        font-size: 13px; 
+        font-weight: 800; 
+        color: #fff; 
+        opacity: .9; 
+    }
+    .inspector-grid { 
+        display: grid; 
+        gap: 12px; 
+    }
+    .info-item { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        font-size: 13px; 
+        padding-bottom: 8px; 
+        border-bottom: 1px solid rgba(255,255,255,.03); 
+    }
+    .info-item label { 
+        color: var(--dim); 
+    }
+    .engine-grid { 
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 8px; 
+    }
+    .engine-badge { 
+        display: inline-flex; 
+        align-items: center; 
+        gap: 6px; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        font-size: 11px; 
+        font-weight: 700; 
+        background: rgba(255,255,255,0.05); 
+        border: 1px solid rgba(255,255,255,0.1); 
+        color: var(--dim); 
+    }
+    .engine-badge.active { 
+        background: rgba(0,242,255,0.1); 
+        border-color: var(--accent); 
+        color: #fff; 
+        box-shadow: 0 0 10px rgba(0,242,255,0.2); 
+    }
+    .engine-badge.active i { 
+        color: var(--accent); 
+    }
+    .engine-badge i { 
+        font-size: 12px; 
+        color: var(--dim); 
+    }
+    .inspector-footer { 
+        padding: 32px; 
+        border-top: 1px solid var(--glass-border); 
+        background: rgba(0,0,0,.2); 
+    }
+</style>
 
 </content>
 </body>

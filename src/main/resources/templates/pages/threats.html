@@ -4,182 +4,670 @@
 <body>
 <content>
 
-<!-- 위험도 필터 카드 -->
-<div class="grid-5 mb16">
+<div class="grid-metrics mb24">
     <th:block th:each="entry : ${severityCounts}">
-        <a th:href="@{/threats(severity=${entry.key}, date=${selectedDate}, search=${search})}"
-           class="sev-card"
-           th:classappend="${currentSeverity == entry.key} ? ' active'"
-           th:data-color="${entry.key == 'critical'} ? '#ff3d5a' :
-                           (${entry.key == 'high'} ? '#ff8c42' :
-                           (${entry.key == 'medium'} ? '#ffd166' :
-                           (${entry.key == 'low'} ? '#06d6a0' : '#00e5ff')))">
-            <div class="sev-count"
-                 th:text="${entry.value}"
-                 th:style="'color:' + (${entry.key == 'critical'} ? '#ff3d5a' :
-                            (${entry.key == 'high'} ? '#ff8c42' :
-                            (${entry.key == 'medium'} ? '#ffd166' :
-                            (${entry.key == 'low'} ? '#06d6a0' : '#00e5ff'))))">
+        <a th:href="@{/threats(severity=${entry.key}, date=${selectedDate}, search=${search}, agentName=${currentAgent}, source=${currentSource}, riskOnly=${riskOnly})}"
+           class="premium-glass metric-box kpi-interactive"
+           th:classappend="${currentSeverity == entry.key} ? ' active' : ''">
+            <div class="metric-header">
+                <span class="metric-label" th:text="${entry.key.toUpperCase()}">LEVEL</span>
+                <i th:if="${currentSeverity == entry.key}" data-lucide="check-circle-2" size="14" style="color:var(--accent);"></i>
             </div>
-            <div class="sev-label"
-                 th:text="${entry.key == 'critical'} ? '위급' :
-                            (${entry.key == 'high'} ? '높음' :
-                            (${entry.key == 'medium'} ? '중간' :
-                            (${entry.key == 'low'} ? '낮음' : '정보')))">
-            </div>
+            <div class="metric-val glow-text" th:text="${entry.value}">0</div>
+            <div class="metric-sub" th:text="'탐지 ' + ${entry.key}">탐지 현황</div>
         </a>
     </th:block>
 </div>
 
-<!-- 이벤트 테이블 -->
-<div class="card">
-    <div class="card-header">
-        <div>
-            <div class="card-title">이벤트 로그</div>
-            <div class="card-sub">
-                <span th:text="${#temporals.format(selectedDate, 'yyyy-MM-dd')}">날짜</span>
-                <span> · </span>
-                <span th:text="${#lists.size(events)} + '건'">0건</span>
+<!-- Command Bar Filter -->
+<div class="premium-glass command-bar-wrapper mb24">
+    <form th:action="@{/threats}" method="get" id="filterForm" class="command-bar">
+        <input type="hidden" name="severity" th:value="${currentSeverity}"/>
+        <input type="hidden" name="page" value="0"/>
+
+        <div class="cb-search">
+            <i data-lucide="search" size="16"></i>
+            <input type="text" name="search" th:value="${search}" placeholder="SPL 쿼리 또는 키워드 입력 (예: IP, 설명)..."/>
+        </div>
+        
+        <div class="cb-filters">
+            <div class="cb-pill">
+                <i data-lucide="calendar" size="12"></i>
+                <input type="date" name="date" th:value="${selectedDate}" onchange="this.form.submit()"/>
+                <button type="button" th:if="${selectedDate != null}" onclick="clearDate()" class="cb-clear">&times;</button>
+            </div>
+            
+            <div class="cb-pill">
+                <i data-lucide="monitor" size="12"></i>
+                <select name="agentName" onchange="this.form.submit()">
+                    <option value="all" th:selected="${currentAgent == 'all'}">전체 자산</option>
+                    <option th:each="name : ${agentList}" th:value="${name}" th:text="${name}" th:selected="${currentAgent == name}"></option>
+                </select>
+            </div>
+
+            <div class="cb-pill">
+                <i data-lucide="shield" size="12"></i>
+                <select name="source" onchange="this.form.submit()">
+                    <option value="all" th:selected="${currentSource == 'all'}">모든 출처</option>
+                    <option value="AGENT" th:selected="${currentSource == 'AGENT'}">Beacon Agent (Endpoint)</option>
+                    <option value="WAZUH" th:selected="${currentSource == 'WAZUH'}">Wazuh (HIDS)</option>
+                    <option value="SURICATA" th:selected="${currentSource == 'SURICATA'}">Suricata (Network IDS)</option>
+                </select>
+            </div>
+
+            <label class="cb-pill cb-checkbox">
+                <input type="checkbox" name="riskOnly" th:checked="${riskOnly}" onchange="this.form.submit()"/>
+                <span>고위험</span>
+            </label>
+        </div>
+    </form>
+</div>
+
+<div class="threat-master-layout">
+    <div class="premium-glass feed-container">
+        <div class="card-header border-b">
+            <div>
+                <div class="card-title glow-text" style="font-size: 15px;">이벤트 탐지 스트림</div>
+                <div class="card-sub" th:text="${selectedDate == null ? '전체 기간 통합 데이터' : #temporals.format(selectedDate, 'yyyy-MM-dd')} + ' | ' + ${totalItems} + ' Events'">총 건수</div>
+            </div>
+            <div class="feed-pagination">
+                <a th:if="${currentPage > 0}" th:href="@{/threats(severity=${currentSeverity}, date=${selectedDate}, search=${search}, agentName=${currentAgent}, source=${currentSource}, riskOnly=${riskOnly}, page=${currentPage - 1})}" class="pg-btn"><i data-lucide="chevron-left" size="14"></i></a>
+                <span class="mono dim">PAGE [[${currentPage} + 1]] / [[${totalPages == 0 ? 1 : totalPages}]]</span>
+                <a th:if="${currentPage + 1 < totalPages}" th:href="@{/threats(severity=${currentSeverity}, date=${selectedDate}, search=${search}, agentName=${currentAgent}, source=${currentSource}, riskOnly=${riskOnly}, page=${currentPage + 1})}" class="pg-btn"><i data-lucide="chevron-right" size="14"></i></a>
             </div>
         </div>
-        <form th:action="@{/threats}" method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="hidden" name="severity" th:value="${currentSeverity}"/>
-            <label class="dim" style="font-size:12px;white-space:nowrap">날짜</label>
-            <input type="date" name="date" th:value="${selectedDate}"
-                   class="search-input" style="max-width:160px"
-                   onchange="this.form.submit()"/>
-            <input type="text" name="search" th:value="${search}"
-                   placeholder="검색 (IP, 유형, ID...)" class="search-input"/>
-            <button type="submit" class="btn-sm accent">검색</button>
-            <a th:href="@{/threats}" class="btn-sm dim">초기화</a>
-        </form>
+
+        <div class="scroll-body event-feed-list" style="overflow-y: auto;">
+            <div th:each="e : ${events}" class="threat-feed-item clickable-row"
+                 th:classappend="${e.severity == 'critical'} ? ' urgent-item' : ''"
+                 th:data-id="${e.dbId}"
+                 th:data-evt-id="${e.id}"
+                 th:data-src-ip="${e.sourceIp}"
+                 th:data-dst-ip="${e.destinationIp}"
+                 th:data-type="${e.type}"
+                 th:data-proto="${e.protocol}"
+                 th:data-port="${e.port}"
+                 th:data-status="${e.status}"
+                 th:data-desc="${e.description}"
+                 th:data-agent="${e.agentName}"
+                 th:data-meta="${e.metadata}"
+                 th:data-time="${e.time}"
+                 th:data-source="${e.source}"
+                 th:data-severity-color="${e.severityColor}"
+                 onclick="openThreatInspector(this)">
+                
+                <div class="t-line" th:style="'background:' + ${e.severityColor}"></div>
+                
+                <div class="t-content">
+                    <div class="t-header">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="t-type" th:text="${e.type}">탐지 유형</span>
+                            <span class="badge" th:style="'font-size:9px; padding:2px 6px; background:'+${e.severityColor}+'1a; color:'+${e.severityColor}+'; border:1px solid '+${e.severityColor}+'33;'" th:text="${e.severityLabel}">위험도</span>
+                        </div>
+                        <span class="t-time mono" th:text="${e.time}">00:00:00</span>
+                    </div>
+                    
+                    <div class="t-flow-visual">
+                        <div class="flow-node attacker">
+                            <i data-lucide="ghost" size="12" th:if="${e.source == 'SURICATA'}"></i>
+                            <i data-lucide="crosshair" size="12" th:if="${e.source != 'SURICATA'}"></i>
+                            <span class="mono" th:text="${e.sourceIp}">192.168.x.x</span>
+                        </div>
+                        <div class="flow-arrow">
+                            <span class="flow-proto" th:text="${e.protocol}">TCP</span>
+                            <i data-lucide="arrow-right" size="12" class="flow-anim"></i>
+                        </div>
+                        <div class="flow-node target">
+                            <i data-lucide="server" size="12"></i>
+                            <span class="mono" th:text="${e.agentName} + ':' + ${e.port}">Agent:00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${#lists.isEmpty(events)}" class="empty-state">
+                <i data-lucide="filter" size="48" style="opacity: 0.3;"></i>
+                <p>필터 조건에 일치하는 이벤트 스트림이 없습니다.</p>
+                <small>현재 선택된 날짜나 에이전트에 위협이 탐지되지 않았습니다.</small>
+            </div>
+        </div>
     </div>
-    <div class="table-wrap scroll-y" style="max-height:520px">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>ID</th><th>위협 유형</th><th>IP 주소</th>
-                    <th>프로토콜</th><th>포트</th><th>위치</th>
-                    <th>위험도</th><th>상태</th><th>시간</th><th>출처</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="e : ${events}" class="clickable-row"
-                    th:data-dbid="${e.dbId}"
-                    th:data-id="${e.id}" th:data-type="${e.type}"
-                    th:data-ip="${e.ip}" th:data-loc="${e.location}"
-                    th:data-sev="${e.severity}" th:data-sevlabel="${e.severityLabel}"
-                    th:data-sevcolor="${e.severityColor}"
-                    th:data-status="${e.status}" th:data-time="${e.time}"
-                    th:data-proto="${e.protocol}" th:data-port="${e.port}"
-                    th:data-source="${e.source}">
-                    <td class="mono accent" th:text="${e.id}"></td>
-                    <td th:text="${e.type}"></td>
-                    <td class="mono dim" th:text="${e.ip}"></td>
-                    <td class="dim" th:text="${e.protocol}"></td>
-                    <td class="mono dim" th:text="${e.port}"></td>
-                    <td class="dim" th:text="${e.location}"></td>
-                    <td>
-                        <span class="badge"
-                              th:text="${e.severityLabel}"
-                              th:style="'color:' + ${e.severityColor} + ';background:' + ${e.severityColor} + '18;border-color:' + ${e.severityColor} + '44'">
-                        </span>
-                    </td>
-                    <td>
-                        <span class="tag"
-                              th:text="${e.status}"
-                              th:style="${e.status == '차단됨'} ? 'color:#06d6a0;background:#06d6a018;border-color:#06d6a044' : 'color:#ffd166;background:#ffd16618;border-color:#ffd16644'">
-                        </span>
-                    </td>
-                    <td class="muted" th:text="${e.time}"></td>
-                    <td class="muted" th:text="${e.source != null ? e.source : '-'}"></td>
-                </tr>
-            </tbody>
-        </table>
+
+    <!-- Inspector -->
+    <div id="threatInspector" class="premium-glass inspector-panel">
+        <div class="empty-inspector">
+            <div class="radar-scan"></div>
+            <i data-lucide="scan-face" size="48" style="color:var(--dim); opacity:0.5; margin-bottom:16px;"></i>
+            <p>좌측 스트림에서 이벤트를 선택하면,<br>상세 패킷 정보와 위협 인텔리전스 콘솔이 활성화됩니다.</p>
+        </div>
     </div>
 </div>
 
-<!-- 상세 패널 (JS로 토글) -->
-<div id="detailPanel" class="detail-panel" style="display:none">
-    <div class="card" style="margin-top:14px">
-        <div class="card-header">
-            <div class="card-title">이벤트 상세</div>
-            <button onclick="closeDetail()" class="btn-icon">×</button>
-        </div>
-        <div class="detail-body">
-            <div class="detail-top" id="detailTop"></div>
-            <div id="detailRows"></div>
-            <div class="detail-actions">
-                <button class="btn-danger" id="blockBtn">IP 차단 (방화벽 규칙 등록)</button>
-                <button class="btn-accent" id="investigateBtn">조사 시작</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function escapeHtml(str) {
-    if (str == null) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;');
+<script th:inline="javascript">
+/*<![CDATA[*/
+function clearDate() {
+    const form = document.getElementById('filterForm');
+    form.querySelector('input[name="date"]').value = '';
+    form.submit();
 }
 
-let currentEventDbId = null;
+function syntaxHighlight(jsonStr) {
+    try {
+        const obj = JSON.parse(jsonStr);
+        let formatted = JSON.stringify(obj, null, 2);
+        formatted = formatted.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return formatted.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+            let cls = 'hl-number';
+            if (/^"/.test(match)) {
+                if (/:$/.test(match)) cls = 'hl-key';
+                else cls = 'hl-string';
+            } else if (/true|false/.test(match)) {
+                cls = 'hl-boolean';
+            } else if (/null/.test(match)) {
+                cls = 'hl-null';
+            }
+            return '<span class="' + cls + '">' + match + '</span>';
+        });
+    } catch(e) {
+        return jsonStr; // fallback
+    }
+}
 
-document.querySelectorAll('.clickable-row').forEach(row => {
-    row.addEventListener('click', () => {
-        const d = row.dataset;
-        currentEventDbId = parseInt(d.dbid, 10);
-        document.getElementById('detailPanel').style.display = 'block';
-        const sevcolor = escapeHtml(d.sevcolor);
-        document.getElementById('detailTop').innerHTML = `
-            <span class="badge" style="color:${sevcolor};background:${sevcolor}18;border-color:${sevcolor}44">${escapeHtml(d.sevlabel)}</span>
-            <div style="font-size:14px;color:#fff;font-weight:600;margin-top:8px">${escapeHtml(d.type)}</div>
-            <div style="font-size:10px;color:var(--dim);margin-top:4px">${escapeHtml(d.id)} · ${escapeHtml(d.time)}</div>
-        `;
-        const sourceLabels = { SURICATA: 'Suricata (파일)', SYSLOG: 'Syslog (UDP)', AGENT: '에이전트 API', MANUAL: '수동 처리' };
-        const rows = [
-            ['소스 IP', d.ip], ['프로토콜', d.proto], ['포트', d.port],
-            ['발원 위치', d.loc], ['처리 상태', d.status],
-            ['수집 출처', sourceLabels[d.source] || d.source || '-'],
-        ];
-        document.getElementById('detailRows').innerHTML = rows.map(([k,v]) =>
-            `<div class="detail-row"><span class="dim">${escapeHtml(k)}</span><span class="mono">${escapeHtml(v)}</span></div>`
-        ).join('');
-        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function openThreatInspector(el) {
+    // 1. 선택된 아이템 하이라이트 변경
+    document.querySelectorAll('.threat-feed-item').forEach(item => item.classList.remove('active-item'));
+    el.classList.add('active-item');
+
+    // 2. 패널 데이터 추출
+    const d = el.dataset;
+    const inspector = document.getElementById('threatInspector');
+    
+    // 3. XSS 방지: 사용자 입력 데이터를 안전하게 이스케이프
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    };
+    
+    // 4. Raw Json 포매팅 (이미 안전한 데이터)
+    const highlightedJson = syntaxHighlight(d.meta || '{}');
+
+    // 5. 안전한 HTML 생성 (사용자 입력은 이스케이프됨)
+    const safeHtml = `
+        <div class="card-header border-b" style="justify-content:space-between;">
+            <div class="card-title">Threat Intelligence</div>
+            <button onclick="closeInspector()" class="icon-btn" style="background:transparent;"><i data-lucide="x" size="16"></i></button>
+        </div>
+        
+        <div class="scroll-body p24" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div>
+                    <div style="font-size:11px; color:var(--dim); margin-bottom:4px; font-weight:700;">EVENT CORRELATION ID</div>
+                    <div class="mono glow-text" style="font-size:22px; color:${escapeHtml(d.severityColor)};">${escapeHtml(d.evtId)}</div>
+                </div>
+                <span class="badge ${d.status === 'pending' ? 'warning' : 'success'}">${d.status === 'pending' ? '미조치' : '해결됨'}</span>
+            </div>
+            
+            <div class="inspector-box network-vis">
+                <div class="section-label mb12"><i data-lucide="git-merge" size="12"></i> Attack Path Visualization</div>
+                <div class="vis-topology">
+                    <div class="vis-node source-node">
+                        <i data-lucide="${d.source === 'SURICATA'? 'webhook' : 'terminal'}" size="20"></i>
+                        <span class="mono">${escapeHtml(d.srcIp)}</span>
+                        <div class="pulse-ring"></div>
+                    </div>
+                    <div class="vis-edge">
+                        <div class="edge-line"></div>
+                        <span class="edge-label mono">${escapeHtml(d.proto)} : ${escapeHtml(d.port)}</span>
+                    </div>
+                    <div class="vis-node dest-node">
+                        <i data-lucide="server" size="20"></i>
+                        <span class="mono">${escapeHtml(d.dstIp)}</span>
+                        <span>${escapeHtml(d.agent)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inspector-box ai-analysis">
+                <div class="section-label mb12"><i data-lucide="sparkles" size="12"></i> Context Analysis</div>
+                <p style="font-size:12px; line-height:1.6; color:#ccc;">${escapeHtml(d.desc) || '해당 이벤트에 대한 AI 시그니처 설명이 존재하지 않습니다.'}</p>
+            </div>
+            
+            <div class="inspector-box raw-payload">
+                <div class="section-label mb12" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span><i data-lucide="file-json" size="12"></i> Raw Payload Packet</span>
+                    <button class="icon-btn" onclick="copyPayload()" title="복사" style="width:24px;height:24px;padding:0;"><i data-lucide="copy" size="12"></i></button>
+                </div>
+                <pre class="json-viewer" id="jsonPayload">${highlightedJson}</pre>
+            </div>
+        </div>
+        
+        <div class="inspector-footer">
+            <div style="display:flex; gap:10px; width:100%;">
+                <button class="btn-danger" style="flex:2; font-weight:700;" onclick="blockIp(${escapeHtml(d.id)}, '${escapeHtml(d.srcIp)}')"><i data-lucide="shield-off" size="14"></i> Source IP 차단</button>
+                <button class="btn-glass" style="flex:1;" onclick="alert('화이트리스트에 등록되었습니다. (Mock)')"><i data-lucide="check-circle" size="14"></i> 오탐 예외</button>
+            </div>
+            <button class="btn-glass w100" style="margin-top:10px;" onclick="isolateAgent('${escapeHtml(d.agent)}')">⚠️ 침해 에이전트 망 분리</button>
+        </div>
+    `;
+    
+    // 6. DOMPurify로 HTML 정제 (추가 보안)
+    inspector.innerHTML = DOMPurify.sanitize(safeHtml);
+    
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function closeInspector() {
+    const inspector = document.getElementById('threatInspector');
+    inspector.innerHTML = `<div class="empty-inspector"><div class="radar-scan"></div><i data-lucide="scan-face" size="48" style="color:var(--dim); opacity:0.5; margin-bottom:16px;"></i><p>좌측 스트림에서 이벤트를 선택하면,<br>상세 패킷 정보와 위협 인텔리전스 콘솔이 활성화됩니다.</p></div>`;
+    document.querySelectorAll('.threat-feed-item').forEach(item => item.classList.remove('active-item'));
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+async function blockIp(dbId, ip) {
+    if (!confirm(`[경고] 출발지 IP (${ip}) 를 전사 방화벽 단에서 즉시 차단하시겠습니까?`)) return;
+    try {
+        const res = await fetch(`/api/threats/${dbId}/block`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alert('차단 정책이 성공적으로 배포되었습니다.');
+            location.reload();
+        }
+        else alert(data.message || '차단 처리에 실패했습니다.');
+    } catch (e) {
+        alert('차단 요청 실패: 서버 런타임 오류가 발생했습니다.');
+    }
+}
+
+function isolateAgent(agentName) {
+    if (!confirm(`에이전트 단말 [${agentName}]이(가) 침해되었을 가능성이 있습니다.\n조사 목적으로 해당 단말의 외부 네트워크를 영구 격리하시겠습니까?`)) return;
+    alert(`[${agentName}] 망 분리 명령이 전파되었습니다. (Mock)`);
+}
+
+function copyPayload() {
+    const text = document.getElementById('jsonPayload').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Payload가 클립보드에 복사되었습니다.');
     });
-});
-
-document.getElementById('blockBtn').addEventListener('click', () => {
-    if (!currentEventDbId) return;
-    if (!confirm('해당 소스 IP를 방화벽 차단 규칙으로 등록하고 이벤트를 "차단됨" 처리합니다.\n계속하시겠습니까?')) return;
-    fetch(`/api/threats/${currentEventDbId}/block`, { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-            const type = data.success ? 'success' : 'error';
-            showToast(data.message, type);
-            if (data.success) { closeDetail(); location.reload(); }
-        })
-        .catch(() => showToast('오류가 발생했습니다', 'error'));
-});
-
-document.getElementById('investigateBtn').addEventListener('click', () => {
-    if (!currentEventDbId) return;
-    fetch(`/api/threats/${currentEventDbId}/investigate`, { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-            showToast(data.message, data.success ? 'info' : 'error');
-            if (data.success) location.reload();
-        })
-        .catch(() => showToast('오류가 발생했습니다', 'error'));
-});
-
-function closeDetail() { document.getElementById('detailPanel').style.display = 'none'; }
+}
+/*]]>*/
 </script>
+
+<style>
+    /* Command Bar */
+    .command-bar-wrapper { 
+        padding: 8px 16px; 
+        border-radius: 12px; 
+    }
+    .command-bar { 
+        display: flex; 
+        gap: 12px; 
+        align-items: center; 
+        width: 100%; 
+    }
+    .cb-search { 
+        display: flex; 
+        align-items: center; 
+        flex: 1; 
+        background: rgba(0,0,0,0.3); 
+        border: 1px solid var(--glass-border); 
+        border-radius: 8px; 
+        padding: 0 12px; 
+        height: 38px; 
+        gap: 8px;
+    }
+    .cb-search i { 
+        color: var(--dim); 
+    }
+    .cb-search input { 
+        width: 100%; 
+        background: transparent; 
+        border: none; 
+        color: #fff; 
+        font-size: 13px; 
+        font-family: var(--font-mono); 
+        outline: none; 
+    }
+    .cb-search input::placeholder { 
+        color: rgba(255,255,255,0.2); 
+    }
+    .cb-filters { 
+        display: flex; 
+        gap: 12px; 
+    }
+    .cb-pill { 
+        display: flex; 
+        align-items: center; 
+        background: rgba(255,255,255,0.03); 
+        border: 1px solid var(--glass-border); 
+        border-radius: 8px; 
+        padding: 0 12px; 
+        height: 38px; 
+        gap: 6px; 
+        font-size: 12px; 
+        color: var(--dim); 
+        position: relative; 
+    }
+    .cb-pill select, 
+    .cb-pill input[type="date"] { 
+        background: transparent; 
+        border: none; 
+        color: #fff; 
+        font-family: var(--font-mono); 
+        font-size: 12px; 
+        outline: none; 
+        cursor: pointer;
+    }
+    .cb-pill select option { 
+        background: #11141e; 
+    }
+    .cb-clear { 
+        background: none; 
+        border: none; 
+        color: var(--dim); 
+        font-size: 16px; 
+        cursor: pointer; 
+        padding: 0; 
+        line-height: 1; 
+    }
+    .cb-checkbox { 
+        cursor: pointer; 
+    }
+    .cb-checkbox input { 
+        accent-color: var(--danger); 
+    }
+    .cb-checkbox span { 
+        color: #fff; 
+    }
+
+    /* Layout & Feed */
+    .threat-master-layout { 
+        display: grid; 
+        grid-template-columns: minmax(0, 1fr) 500px; 
+        gap: 24px; 
+        height: 650px; 
+    }
+    .feed-container { 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+    }
+    .event-feed-list { 
+        flex: 1; 
+        padding: 16px; 
+    }
+    
+    .threat-feed-item { 
+        display: flex; 
+        align-items: stretch; 
+        gap: 16px; 
+        padding: 14px; 
+        background: rgba(0,0,0,0.2); 
+        border: 1px solid rgba(255,255,255,0.05); 
+        border-radius: 12px; 
+        margin-bottom: 10px; 
+        transition: 0.2s; 
+        cursor: pointer; 
+    }
+    .threat-feed-item:hover { 
+        transform: translateX(4px); 
+        background: rgba(0,242,255,0.03); 
+        border-color: rgba(0,242,255,0.2); 
+    }
+    .active-item { 
+        background: rgba(0,242,255,0.08) !important; 
+        border-color: rgba(0,242,255,0.4) !important; 
+    }
+    
+    .t-line { 
+        width: 3px; 
+        border-radius: 3px; 
+    }
+    .t-content { 
+        flex: 1; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: center;
+    }
+    .t-header { 
+        display: flex; 
+        justify-content: space-between; 
+        margin-bottom: 10px; 
+        align-items: center;
+    }
+    .t-type { 
+        font-weight: 700; 
+        color: #fff; 
+        font-size: 13px; 
+    }
+    
+    .t-flow-visual { 
+        display: flex; 
+        align-items: center; 
+        gap: 12px; 
+        font-size: 11px; 
+        background: rgba(0,0,0,0.4); 
+        padding: 8px 12px; 
+        border-radius: 8px;
+    }
+    .flow-node { 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+        color: #fff; 
+    }
+    .flow-node.attacker i { 
+        color: var(--danger); 
+    }
+    .flow-node.target i { 
+        color: var(--accent); 
+    }
+    .flow-arrow { 
+        flex: 1; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        position: relative;
+    }
+    .flow-proto { 
+        position: absolute; 
+        top: -10px; 
+        font-size: 9px; 
+        color: var(--dim); 
+        font-weight: 700;
+    }
+    .flow-anim { 
+        color: var(--dim); 
+        animation: slideRight 1.5s infinite linear; 
+        opacity: 0.5;
+    }
+    
+    @keyframes slideRight { 
+        0% { transform: translateX(-10px); opacity: 0;} 
+        50% { opacity: 1;} 
+        100% { transform: translateX(10px); opacity: 0;} 
+    }
+
+    /* Inspector */
+    .inspector-panel { 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden;
+    }
+    .inspector-footer { 
+        padding: 20px; 
+        border-top: 1px solid var(--glass-border); 
+        background: rgba(0,0,0,0.2); 
+    }
+    .inspector-box { 
+        background: rgba(0,0,0,0.3); 
+        border: 1px solid var(--glass-border); 
+        padding: 16px; 
+        border-radius: 12px; 
+    }
+    .section-label { 
+        font-size: 10px; 
+        text-transform: uppercase; 
+        font-weight: 800; 
+        color: var(--accent); 
+        letter-spacing: 1px; 
+        display: flex; 
+        align-items: center; 
+        gap: 6px;
+    }
+    
+    /* Topology Visualization */
+    .vis-topology { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        padding: 10px; 
+        position: relative; 
+        overflow: hidden;
+    }
+    .vis-node { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        gap: 8px; 
+        font-size: 11px; 
+        position: relative; 
+        z-index: 2;
+    }
+    .source-node { 
+        color: #ff3d5a; 
+    }
+    .dest-node { 
+        color: #00f2ff; 
+    }
+    .vis-node .mono { 
+        color: #fff; 
+        font-size: 12px;
+    }
+    .vis-edge { 
+        flex: 1; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        padding: 0 10px; 
+        position: relative;
+    }
+    .edge-line { 
+        width: 100%; 
+        height: 2px; 
+        background: linear-gradient(90deg, #ff3d5a 0%, #00f2ff 100%); 
+        position: relative;
+    }
+    .edge-line::after { 
+        content: ''; 
+        position: absolute; 
+        top: -2px; 
+        left: 0; 
+        width: 6px; 
+        height: 6px; 
+        background: #fff; 
+        border-radius: 50%; 
+        box-shadow: 0 0 10px #fff; 
+        animation: packetMove 1s infinite linear;
+    }
+    .edge-label { 
+        font-size: 10px; 
+        color: #ccc; 
+        margin-top: 8px; 
+        background: rgba(0,0,0,0.5); 
+        padding: 2px 6px; 
+        border-radius: 4px;
+    }
+    
+    @keyframes packetMove { 
+        0% { left: 0%; opacity: 0;} 
+        50% {opacity: 1;} 
+        100% { left: 100%; opacity: 0;} 
+    }
+    .pulse-ring { 
+        position: absolute; 
+        top: 2px; 
+        left: calc(50% - 10px); 
+        width: 20px; 
+        height: 20px; 
+        border-radius: 50%; 
+        border: 1px solid #ff3d5a; 
+        animation: pulse 2s infinite ease-out;
+    }
+    @keyframes pulse { 
+        0% { transform: scale(1); opacity: 1;} 
+        100% { transform: scale(3); opacity: 0;} 
+    }
+
+    /* JSON Viewer */
+    .json-viewer { 
+        background: #0d1117; 
+        padding: 12px; 
+        border-radius: 8px; 
+        font-size: 11px; 
+        font-family: var(--font-mono); 
+        color: #c9d1d9; 
+        overflow-x: auto; 
+        margin: 0; 
+        line-height: 1.4; 
+        max-height: 200px;
+    }
+    .hl-string { color: #50e3c2; }
+    .hl-number { color: #ffca28; }
+    .hl-boolean { color: #ff3d5a; }
+    .hl-null { color: #94a3b8; font-style: italic; }
+    .hl-key { color: #00f2ff; font-weight: 600; }
+
+    .empty-inspector { 
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        color: var(--dim); 
+        text-align: center; 
+        position: relative;
+    }
+    .radar-scan { 
+        position: absolute; 
+        width: 150px; 
+        height: 150px; 
+        border-radius: 50%; 
+        background: conic-gradient(from 0deg, transparent 70%, rgba(0, 242, 255, 0.4) 100%); 
+        animation: spin 4s linear infinite; 
+        top: calc(50% - 120px); 
+        left: calc(50% - 75px); 
+        border: 1px solid rgba(0, 242, 255, 0.2); 
+        opacity: 0.3;
+    }
+    @keyframes spin { 
+        100% { transform: rotate(360deg); } 
+    }
+    
+    .feed-pagination {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .pg-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        color: var(--text);
+        text-decoration: none;
+        transition: 0.2s;
+    }
+    .pg-btn:hover {
+        background: var(--glass-hover);
+        border-color: var(--accent);
+    }
+</style>
 
 </content>
 </body>

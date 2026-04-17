@@ -1,7 +1,11 @@
 package com.example.beacon.service;
 
+import com.example.beacon.entity.Agent;
+import com.example.beacon.entity.FirewallAgentCommand;
 import com.example.beacon.entity.TrafficLog;
 import com.example.beacon.exception.ResourceNotFoundException;
+import com.example.beacon.repository.AgentRepository;
+import com.example.beacon.repository.FirewallAgentCommandRepository;
 import com.example.beacon.repository.TrafficLogRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,29 @@ public class TrafficAnalysisService {
     private final TrafficLogRepository trafficLogRepository;
     private final ObjectMapper objectMapper;
     private final AgentService agentService;
+    private final AgentRepository agentRepository;
+    private final FirewallAgentCommandRepository commandRepository;
+
+    @Transactional
+    public void scheduleProcessKill(String agentName, Integer pid, String processName) throws Exception {
+        Agent agent = agentRepository.findByAgentName(agentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", agentName));
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("pid", pid);
+        payload.put("process_name", processName);
+
+        FirewallAgentCommand command = FirewallAgentCommand.builder()
+                .agentId(agent.getId())
+                .commandId(java.util.UUID.randomUUID().toString())
+                .revision(System.currentTimeMillis())
+                .action("KILL_PROCESS")
+                .payload(objectMapper.writeValueAsString(payload))
+                .build();
+
+        commandRepository.save(command);
+        log.info("Process kill command scheduled: agent={}, pid={}, proc={}", agentName, pid, processName);
+    }
 
     /**
      * 트래픽 로그를 저장하고, sourceIp로 식별되는 에이전트의
@@ -32,9 +59,24 @@ public class TrafficAnalysisService {
      */
     @Transactional
     public TrafficLog logTraffic(TrafficLog trafficLog) {
-        TrafficLog saved = trafficLogRepository.save(trafficLog);
+        // [작업 3] 실시간 이상 탐지 규칙 엔진 (포트 및 패턴 기반)
+        if (isAnomalousPattern(trafficLog)) {
+            trafficLog.setIsAnomaly(true);
+            trafficLog.setAnomalyScore(9.5);
+            trafficLog.setAnomalyReason("위험 포트 감지 또는 비정상 패턴 (Rule-based Detection)");
+        }
 
-        if (trafficLog.getSourceIp() != null) {
+        TrafficLog saved = trafficLogRepository.save(trafficLog);
+        
+        // 에이전트 카운터 업데이트 로직 유지
+        if (trafficLog.getAgentName() != null) {
+            try {
+                agentService.incrementTrafficCount(trafficLog.getAgentName());
+            } catch (Exception e) {
+                log.warn("Failed to increment agent traffic count for agentName={}: {}",
+                        trafficLog.getAgentName(), e.getMessage());
+            }
+        } else if (trafficLog.getSourceIp() != null) {
             try {
                 agentService.incrementTrafficCountByIp(trafficLog.getSourceIp());
             } catch (Exception e) {
@@ -45,9 +87,41 @@ public class TrafficAnalysisService {
 
         return saved;
     }
+
+    private boolean isAnomalousPattern(TrafficLog log) {
+        int dPort = log.getDestinationPort();
+        int sPort = log.getSourcePort();
+        
+        // 1. 알려진 공격/악성 포트 블랙리스트
+        List<Integer> backdoors = List.of(4444, 6667, 31337, 81, 1337);
+        if (backdoors.contains(dPort) || backdoors.contains(sPort)) return true;
+        
+        // 2. 비정상적인 대용량 전송 (단건 100MB 초과)
+        if (log.getBytesTransferred() > 100 * 1024 * 1024) return true;
+        
+        return false;
+    }
     
     @Transactional(readOnly = true)
-    public Page<TrafficLog> getTrafficLogs(Pageable pageable) {
+    public List<Map<String, Object>> getProcessStats(String agentName) {
+        LocalDateTime since = LocalDateTime.now().minusHours(1);
+        List<Object[]> results = trafficLogRepository.getProcessTrafficStats(agentName, since);
+        
+        return results.stream().map(r -> {
+            Map<String, Object> map = new HashMap<>();
+            String rawProcess = (String) r[0];
+            // JSON_EXTRACT 결과인 "process.exe"에서 따옴표 제거
+            map.put("processName", rawProcess != null ? rawProcess.replace("\"", "") : "Unknown");
+            map.put("totalBytes", r[1]);
+            return map;
+        }).toList();
+    }
+    
+    @Transactional(readOnly = true)
+    public Page<TrafficLog> getTrafficLogs(String agentName, Pageable pageable) {
+        if (agentName != null && !agentName.isEmpty()) {
+            return trafficLogRepository.findByAgentName(agentName, pageable);
+        }
         return trafficLogRepository.findAll(pageable);
     }
     

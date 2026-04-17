@@ -67,9 +67,17 @@ public class AgentService {
     
     @Transactional
     public void updateHeartbeat(String agentName) {
+        updateHeartbeat(agentName, null);
+    }
+
+    @Transactional
+    public void updateHeartbeat(String agentName, String metadata) {
         agentRepository.findByAgentName(agentName).ifPresent(agent -> {
             agent.setLastHeartbeat(LocalDateTime.now());
             agent.setStatus("online");
+            if (metadata != null && !metadata.isBlank()) {
+                agent.setMetadata(metadata);
+            }
             agentRepository.save(agent);
         });
     }

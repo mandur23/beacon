@@ -4,140 +4,374 @@
 <body>
 <content>
 
-<!-- KPI 카드 -->
-<div class="grid-4 mb16">
-    <div th:each="s : ${stats}" class="stat-card"
-         th:style="'border-color:' + ${s.color} + '33'">
-        <div th:style="'background:linear-gradient(90deg,transparent,' + ${s.color} + ',transparent)'"
-             class="stat-top-bar"></div>
-        <div class="stat-head">
-            <span class="stat-label" th:text="${s.label}"></span>
-            <span class="stat-icon" th:text="${s.icon}"></span>
-        </div>
-        <div class="stat-value" th:text="${s.value}"
-             th:style="'color:' + ${s.color}"
-             th:classappend="${s.blink} ? ' blink'"></div>
-        <div class="stat-sub" th:text="${s.sub}"></div>
-    </div>
-</div>
-
-<!-- 차트 + 점수 -->
-<div class="grid-12 mb16">
-    <div class="card span-8">
-        <div class="card-header">
-            <div>
-                <div class="card-title">24시간 위협 감지 현황</div>
-                <div class="card-sub">시간대별 공격 시도 집계</div>
-            </div>
-            <div class="legend">
-                <span class="legend-item red">● 감지</span>
-                <span class="legend-item accent">● 차단</span>
+<section class="ops-hero">
+    <div class="premium-glass ops-hero-main">
+        <div class="ops-hero-copy">
+            <span class="eyebrow" style="color: var(--accent);">Real-Time Command Center</span>
+            <h2 style="font-size: 28px; line-height: 1.3;">통합 보안 체계 정상 가동 중.<br>신속 대응 및 정책 강제 동기화가 가능합니다.</h2>
+            <p>
+                현재 <span th:text="${stats[1].value}" style="color:var(--accent); font-weight: 700;">0</span>개의 에이전트가 비콘으로 상태를 보고하고 있습니다.
+            </p>
+            <div class="ops-hero-actions" style="margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn-danger" style="font-weight: 800; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);" onclick="globalKillSwitch()">
+                    <i data-lucide="power" size="18"></i> Agent 전체 격리 (Kill-Switch)
+                </button>
+                <button class="btn-glass" style="padding: 12px 24px; border-radius: 8px;" onclick="syncPolicies()">
+                    <i data-lucide="refresh-cw" size="18"></i> 방화벽 정책 긴급 동기화
+                </button>
             </div>
         </div>
-        <div class="chart-area">
-            <canvas id="hourlyChart" height="80"></canvas>
+        <div class="ops-hero-stats">
+            <div class="ops-stat" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3);">
+                <span class="success" style="font-weight: 700; color: #10b981;">차단 완료율</span>
+                <strong class="success" th:text="${resolveRate}">100%</strong>
+            </div>
+            <div class="ops-stat">
+                <span>평균 대응 시간</span>
+                <strong th:text="${avgResponseTime}">0분</strong>
+            </div>
+            <div class="ops-stat" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
+                <span class="danger" style="font-weight: 700; color: #ef4444;">활성 위협 건수</span>
+                <strong class="danger" th:text="${stats[2].value}">0</strong>
+            </div>
         </div>
     </div>
 
-    <div class="card span-4">
-        <div class="card-header"><div class="card-title">보안 점수</div></div>
-        <div class="gauge-wrap">
+    <div class="premium-glass ops-score-card">
+        <div class="eyebrow">보안 점수</div>
+        <div class="score-chart-wrap">
             <canvas id="gaugeChart" width="180" height="130"></canvas>
+            <div class="score-overlay" th:text="${stats[3].value} + '%'">0%</div>
         </div>
-        <div class="gauge-items">
-            <div class="gauge-row"><span class="gauge-key">방화벽</span><span class="green">● 정상</span></div>
-            <div class="gauge-row"><span class="gauge-key">IDS/IPS</span><span class="green">● 활성</span></div>
-            <div class="gauge-row"><span class="gauge-key">VPN</span><span class="green">● 정상</span></div>
-            <div class="gauge-row"><span class="gauge-key">백신</span><span class="yellow">● 업데이트 필요</span></div>
+        <p>위협 발생량, 조치 진행률, 에이전트 가용 상태를 종합해 계산한 현재 보안 안정도입니다.</p>
+    </div>
+</section>
+
+<!-- 실시간 미션 가이드 섹션 제거됨 (운영 모드) -->
+
+<div class="grid-metrics mb24">
+    <div th:each="s : ${stats}" class="premium-glass metric-box" th:style="'--metric-color:' + ${s.color}">
+        <div class="metric-header">
+            <span class="metric-label" th:text="${s.label}">LABEL</span>
+            <i data-lucide="activity" size="16"></i>
         </div>
+        <div class="metric-val" th:text="${s.value}">0</div>
+        <div class="metric-sub" th:text="${s.sub}">SUBTEXT</div>
     </div>
 </div>
 
-<!-- 최근 이벤트 + 시간대 분포 -->
-<div class="grid-2 mb16">
-    <div class="card">
+<section class="dashboard-grid-2">
+    <div class="premium-glass">
         <div class="card-header">
             <div>
-                <div class="card-title">최근 보안 이벤트</div>
-                <div class="card-sub">실시간 업데이트</div>
+                <div class="card-title glow-text">24시간 공격 추이</div>
+                <div class="card-sub">이상 급증 구간을 빠르게 찾고 추가 분석이 필요한 시간을 파악합니다.</div>
             </div>
-            <span class="tag red">LIVE</span>
         </div>
-        <div class="table-wrap">
-            <table class="data-table">
-                <thead>
-                    <tr><th>이벤트</th><th>유형</th><th>IP</th><th>위험도</th><th>시간</th></tr>
-                </thead>
-                <tbody>
-                    <tr th:each="e : ${recentEvents}">
-                        <td class="mono accent" th:text="${e.id}"></td>
-                        <td th:text="${e.type}"></td>
-                        <td class="mono dim" th:text="${e.ip}"></td>
-                        <td>
-                            <span class="badge"
-                                  th:text="${e.severityLabel}"
-                                  th:style="'color:' + ${e.severityColor} + ';background:' + ${e.severityColor} + '18;border-color:' + ${e.severityColor} + '44'">
-                            </span>
-                        </td>
-                        <td class="muted" th:text="${e.time}"></td>
-                    </tr>
-                </tbody>
-            </table>
+        <div style="padding: 24px; height: 300px;">
+            <canvas id="attackTimelineChart"></canvas>
         </div>
     </div>
 
-    <div class="card">
+    <div class="premium-glass">
         <div class="card-header">
-            <div class="card-title">시간대별 공격 빈도</div>
-            <div class="card-sub">오늘 24시간</div>
-        </div>
-        <div class="bar-wrap">
-            <canvas id="barChart" height="80"></canvas>
-        </div>
-        <div class="bar-legend">
-            <span class="muted">00시</span>
-            <span class="red">▲ 피크 14~16시</span>
-            <span class="muted">23시</span>
-        </div>
-        <div class="grid-2-sm">
-            <div class="mini-stat">
-                <div class="mini-label">총 감지</div>
-                <div class="mini-value red" id="totalCount">-</div>
+            <div>
+                <div class="card-title glow-text">위협 분포 분석</div>
+                <div class="card-sub">정책을 조정하기 전에 어떤 유형의 위협이 주도적인지 먼저 확인합니다.</div>
             </div>
-            <div class="mini-stat">
-                <div class="mini-label">최대 시간</div>
-                <div class="mini-value orange">14시 178건</div>
+        </div>
+        <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center;">
+            <div style="height: 250px;">
+                <canvas id="threatDistributionChart"></canvas>
             </div>
-            <div class="mini-stat">
-                <div class="mini-label">평균/시간</div>
-                <div class="mini-value accent" id="avgCount">-</div>
-            </div>
-            <div class="mini-stat">
-                <div class="mini-label">차단율</div>
-                <div class="mini-value green">96.2%</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div th:each="dist : ${threatDistribution}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span th:style="'width:8px; height:8px; border-radius:50%; background:' + ${dist.color}"></span>
+                        <span style="font-size: 13px; font-weight: 500;" th:text="${dist.label}">TYPE</span>
+                    </div>
+                    <span class="mono" th:text="${dist.pct} + '%'" style="font-weight: 700;">0%</span>
+                </div>
             </div>
         </div>
     </div>
-</div>
+</section>
 
+<section class="premium-glass">
+    <div class="card-header">
+        <div>
+            <div class="card-title glow-text">고우선 이벤트 피드</div>
+            <div class="card-sub">즉시 확인, 차단, 후속 조치가 필요한 이벤트를 먼저 보여줍니다.</div>
+        </div>
+        <div class="segmented-control">
+            <div class="seg-btn active">실시간 보드</div>
+            <div class="seg-btn" th:onclick="|location.href='@{/threats}'|" style="cursor:pointer;">위협 보관함</div>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="p-table cyber-table">
+            <thead>
+            <tr>
+                <th>이벤트 ID</th>
+                <th>유형</th>
+                <th>출발지</th>
+                <th>위험도</th>
+                <th>상태</th>
+                <th>탐지 시각</th>
+            </tr>
+            </thead>
+            <tbody id="dashboardEventFeed">
+            <tr class="event-row" th:each="e : ${recentEvents}" 
+                th:classappend="${e.severity == 'critical'} ? 'row-high-risk' : ''">
+                <td class="mono accent" th:text="${e.id}"></td>
+                <td>
+                    <div style="display:flex; flex-direction:column;">
+                        <span th:text="${e.type}" style="font-weight:600; color:#fff;">TYPE</span>
+                        <span th:text="${e.description}" style="font-size:10px; color:var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">DESC</span>
+                    </div>
+                </td>
+                <td class="mono">
+                    <div style="display:flex; flex-direction:column;">
+                        <span th:text="${e.ip}">0.0.0.0</span>
+                        <span th:text="${e.location}" style="font-size:10px; color:var(--dim);">Location</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge" th:style="'color:' + ${e.severityColor} + '; background:' + ${e.severityColor} + '1a; border: 1px solid ' + ${e.severityColor} + '66;'">
+                        <span class="badge-dot" th:classappend="${e.severity == 'critical'} ? 'pulse' : ''"></span>
+                        <th:block th:text="${e.severityLabel}"></th:block>
+                    </span>
+                </td>
+                <td>
+                    <span class="badge" th:classappend="${e.status == 'pending'} ? 'warning' : 'success'">
+                        <th:block th:text="${e.status}"></th:block>
+                    </span>
+                </td>
+                <td class="mono dim" th:text="${e.time}">TIME</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(recentEvents)}">
+                <td colspan="6" style="text-align:center; padding: 48px; color:var(--dim);">현재 즉시 검토가 필요한 고위험 이벤트가 없습니다.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script th:inline="javascript">
+    /*<![CDATA[*/
     const hourlyData = /*[[${hourlyData}]]*/ [];
-    const currentHour = new Date().getHours();
+    const threatDist = /*[[${threatDistribution}]]*/ [];
+    const securityScore = /*[[${stats[3].value}]]*/ 85;
 
-    // 총계 / 평균
-    const total = hourlyData.reduce((a, b) => a + b, 0);
-    document.getElementById('totalCount').textContent = total.toLocaleString() + '건';
-    document.getElementById('avgCount').textContent = Math.round(total / 24) + '건';
+    document.addEventListener('DOMContentLoaded', () => {
+        const timelineCtx = document.getElementById('attackTimelineChart').getContext('2d');
+        const labels = Array.from({length: 24}, (_, i) => i + ':00');
 
-    // 24시간 라인 차트
-    drawLineChart('hourlyChart', hourlyData, currentHour);
+        const grad = timelineCtx.createLinearGradient(0, 0, 0, 300);
+        grad.addColorStop(0, 'rgba(0, 242, 255, 0.3)');
+        grad.addColorStop(1, 'rgba(0, 242, 255, 0.0)');
 
-    // 바 차트
-    drawBarChart('barChart', hourlyData, currentHour);
+        new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '탐지 건수',
+                    data: hourlyData,
+                    borderColor: '#00f2ff',
+                    borderWidth: 3,
+                    fill: true,
+                    backgroundColor: grad,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#00f2ff',
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } }, beginAtZero: true }
+                }
+            }
+        });
 
-    // 게이지
-    drawGauge('gaugeChart', 87);
+        const distCtx = document.getElementById('threatDistributionChart').getContext('2d');
+        new Chart(distCtx, {
+            type: 'doughnut',
+            data: {
+                labels: threatDist.map(d => d.label),
+                datasets: [{
+                    data: threatDist.map(d => d.pct),
+                    backgroundColor: threatDist.map(d => d.color),
+                    borderWidth: 0,
+                    hoverOffset: 15
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '75%',
+                plugins: { legend: { display: false } },
+                onClick: (evt, item) => {
+                    if(item.length > 0) {
+                        const idx = item[0].index;
+                        const label = threatDist[idx].label;
+                        filterTableByEngine(label);
+                    } else {
+                        filterTableByEngine(null);
+                    }
+                }
+            }
+        });
+
+        const gaugeCtx = document.getElementById('gaugeChart').getContext('2d');
+        new Chart(gaugeCtx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [securityScore, 100 - securityScore],
+                    backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.05)'],
+                    borderWidth: 0,
+                    circumference: 180,
+                    rotation: 270,
+                    cutout: '85%',
+                    borderRadius: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { tooltip: { enabled: false } }
+            }
+        });
+
+    });
+    
+    // Global Quick Actions
+    function globalKillSwitch() {
+        if (!confirm(`[경고] Kill-Switch를 발동하시겠습니까?\n\n이 기능은 모든 에이전트의 외부 연결을 끊고 내부망만 활성화시킵니다.\n긴급 상황 외에는 사용을 자제하세요.`)) return;
+        alert("Global Kill-Switch 명령이 전송되어 모든 에이전트에 적용되었습니다. (Mock)");
+    }
+
+    function syncPolicies() {
+        if (!confirm('방화벽 정책 동기화를 재실행하시겠습니까?\n각 에이전트에 최신 룰셋이 강제 푸시됩니다.')) return;
+        alert("정책 동기화 작업이 큐에 추가되었습니다. (Mock)");
+    }
+
+    /*]]>*/
 </script>
+
+<style>
+    .ops-hero { 
+        display: grid; 
+        grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); 
+        gap: 24px; 
+        margin-bottom: 24px; 
+    }
+    .ops-hero-main { 
+        padding: 32px; 
+        display: grid; 
+        gap: 28px; 
+    }
+    .ops-hero-copy h2 { 
+        font-family: var(--font-title); 
+        font-size: 34px; 
+        line-height: 1.08; 
+        margin: 10px 0 14px; 
+        max-width: 760px; 
+    }
+    .ops-hero-copy p { 
+        color: var(--dim); 
+        font-size: 15px; 
+        max-width: 720px; 
+        line-height: 1.7; 
+    }
+    .ops-hero-stats { 
+        display: grid; 
+        grid-template-columns: repeat(3, 1fr); 
+        gap: 16px; 
+    }
+    .ops-stat { 
+        padding: 18px; 
+        border-radius: 14px; 
+        background: rgba(255,255,255,0.03); 
+        border: 1px solid rgba(255,255,255,0.06); 
+    }
+    .ops-stat span { 
+        display: block; 
+        color: var(--dim); 
+        font-size: 11px; 
+        text-transform: uppercase; 
+        letter-spacing: 0.08em; 
+        margin-bottom: 8px; 
+    }
+    .ops-stat strong { 
+        font-family: var(--font-mono); 
+        font-size: 24px; 
+    }
+    .ops-score-card { 
+        padding: 28px; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between; 
+    }
+    .score-chart-wrap { 
+        position: relative; 
+        min-height: 180px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+    }
+    .score-overlay { 
+        position: absolute; 
+        bottom: 18px; 
+        font-family: var(--font-mono); 
+        font-size: 34px; 
+        font-weight: 800; 
+        color: var(--accent); 
+        text-shadow: 0 0 15px var(--accent); 
+    }
+    .ops-score-card p { 
+        color: var(--dim); 
+        font-size: 13px; 
+        line-height: 1.6; 
+    }
+    .dashboard-grid-2 { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 24px; 
+        margin-bottom: 24px; 
+    }
+    .row-high-risk { 
+        background: rgba(239, 68, 68, 0.05) !important; 
+        position: relative; 
+    }
+    .row-high-risk::before { 
+        content: ''; 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        bottom: 0; 
+        width: 4px; 
+        background: var(--danger); 
+        box-shadow: 0 0 10px var(--danger); 
+    }
+    
+    @media (max-width: 1100px) {
+        .ops-hero, 
+        .dashboard-grid-2 { 
+            grid-template-columns: 1fr; 
+        }
+        .ops-hero-stats { 
+            grid-template-columns: 1fr; 
+        }
+    }
+</style>
 
 </content>
 </body>

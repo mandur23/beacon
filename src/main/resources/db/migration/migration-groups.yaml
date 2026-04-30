@@ -1,0 +1,28 @@
+versioned_migrations:
+  common:
+    - V1__Initial_Schema.sql
+
+  auth:
+    - V2__Seed_Admin_User.sql
+
+  agent:
+    - V5__Add_Agents_Table.sql
+    - V6__Add_Updated_At_To_Agents.sql
+
+  policy:
+    - V7__Event_Blocking_Policies.sql
+
+  security_event:
+    - V8__Add_Source_To_Security_Events.sql
+    - V10__Security_Events_Indexes.sql
+    - V14__Add_Agent_Name_To_Security_Events.sql
+    - V15__Extend_Metadata_Column_Size.sql
+
+  firewall:
+    - V9__Firewall_Rules_Dedup_And_Unique_Index.sql
+    - V11__Firewall_Agent_Sync.sql
+    - V12__Firewall_Agent_Commands_Cascade.sql
+    - V13__Firewall_Agent_Commands_Created_At_Index.sql
+
+  traffic:
+    - V16__Add_Agent_Name_To_Traffic_Logs.sql

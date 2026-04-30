@@ -102,8 +102,3 @@ CREATE TABLE IF NOT EXISTS firewall_rules (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_by VARCHAR(50)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- 기본 관리자 계정 생성 (비밀번호: admin1234)
-INSERT INTO users (username, password, email, name, role, enabled, mfa_enabled)
-VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'admin@beacon.local', '관리자', 'ADMIN', TRUE, FALSE)
-ON DUPLICATE KEY UPDATE username = username;

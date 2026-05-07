@@ -4,9 +4,10 @@ server:
     # 기본 false: http:// 접속. HTTPS는 SERVER_SSL_ENABLED=true (또는 .env)
     enabled: ${SERVER_SSL_ENABLED:false}
     key-store: classpath:keystore.p12
-    key-store-password: ${SERVER_SSL_KEYSTORE_PASSWORD:beacon1234}
+    # mkcert -pkcs12 기본 비밀번호는 changeit
+    key-store-password: ${SERVER_SSL_KEYSTORE_PASSWORD:changeit}
     key-store-type: PKCS12
-    key-alias: beacon
+    key-alias: ${SERVER_SSL_KEY_ALIAS:1}
 
 spring:
   application:

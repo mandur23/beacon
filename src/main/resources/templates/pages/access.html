@@ -42,6 +42,9 @@
                 <div class="card-title glow-text">계정 및 권한 관리 (IAM)</div>
                 <div class="card-sub">관리 대상 식별자 정보 및 보안 속성 제어</div>
             </div>
+            <button class="btn-glass" style="padding:8px 12px;" onclick="openCreateUserModal()">
+                <i data-lucide="user-plus" size="14"></i> 계정 생성
+            </button>
         </div>
         
         <div class="table-container">
@@ -167,8 +170,23 @@
         
         <div class="inspector-section" style="padding:16px; background:rgba(239, 68, 68, 0.05); border:1px solid rgba(239, 68, 68, 0.2); border-radius:12px;">
             <p style="font-size:12px; color:var(--danger); font-weight:700; margin-bottom:8px;">위험 관리</p>
-            <p style="font-size:11px; color:var(--dim); margin-bottom:12px;">이 계정의 모든 활성 세션을 즉시 종료하고 계정을 일시 정지합니다.</p>
-            <button class="btn-danger-sm" style="width:100%; padding:10px; border-radius:8px;">계정 강제 격리 (SUSPEND)</button>
+            <p style="font-size:11px; color:var(--dim); margin-bottom:12px;">선택한 계정을 시스템에서 삭제합니다. 삭제 후 복구할 수 없습니다.</p>
+            <button class="btn-danger-sm" style="width:100%; padding:10px; border-radius:8px;" onclick="deleteSelectedUser()">
+                <i data-lucide="trash-2" size="12"></i> 계정 삭제
+            </button>
+        </div>
+
+        <div class="inspector-section" style="padding:16px; background:rgba(16, 185, 129, 0.05); border:1px solid rgba(16, 185, 129, 0.25); border-radius:12px; margin-top:12px;">
+            <p style="font-size:12px; color:var(--success); font-weight:700; margin-bottom:8px;">MFA 정책 제어</p>
+            <p style="font-size:11px; color:var(--dim); margin-bottom:12px;">선택한 계정의 다중 인증 활성/비활성 상태를 즉시 변경합니다.</p>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <button class="btn-danger-sm" style="justify-content:center; background:rgba(16,185,129,0.12); color:var(--success); border-color:rgba(16,185,129,0.4);" onclick="updateUserMfa(true)">
+                    <i data-lucide="shield-check" size="12"></i> MFA 활성화
+                </button>
+                <button class="btn-danger-sm" style="justify-content:center;" onclick="updateUserMfa(false)">
+                    <i data-lucide="shield-off" size="12"></i> MFA 비활성화
+                </button>
+            </div>
         </div>
     </div>
     <div class="inspector-footer">
@@ -198,17 +216,85 @@
     </div>
 </div>
 
+<!-- Create User Modal -->
+<div id="createUserModal" class="simple-modal">
+    <div class="simple-modal-card premium-glass">
+        <div class="inspector-header" style="padding:16px 20px;">
+            <h3 style="color:#fff; margin:0;">신규 계정 생성</h3>
+            <button class="icon-btn" onclick="closeCreateUserModal()"><i data-lucide="x"></i></button>
+        </div>
+        <div style="padding:20px; display:grid; gap:12px;">
+            <div class="info-item" style="display:block;">
+                <label style="display:block; margin-bottom:6px;">사용자명</label>
+                <input id="createUsername" class="input-dark" type="text" placeholder="username" />
+            </div>
+            <div class="info-item" style="display:block;">
+                <label style="display:block; margin-bottom:6px;">이름</label>
+                <input id="createName" class="input-dark" type="text" placeholder="표시 이름" />
+            </div>
+            <div class="info-item" style="display:block;">
+                <label style="display:block; margin-bottom:6px;">이메일</label>
+                <input id="createEmail" class="input-dark" type="email" placeholder="user@beacon.local" />
+            </div>
+            <div class="info-item" style="display:block;">
+                <label style="display:block; margin-bottom:6px;">역할</label>
+                <select id="createRole" class="input-dark">
+                    <option value="ANALYST">ANALYST</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="OPERATOR">OPERATOR</option>
+                    <option value="VIEWER">VIEWER</option>
+                    <option value="USER">USER</option>
+                </select>
+            </div>
+            <div class="info-item" style="display:block;">
+                <label style="display:block; margin-bottom:6px;">초기 비밀번호</label>
+                <input id="createPassword" class="input-dark" type="text" placeholder="Changeme123!" value="Changeme123!" />
+            </div>
+        </div>
+        <div class="inspector-footer" style="padding:12px 20px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button class="btn-neutral-sm" onclick="closeCreateUserModal()">
+                <i data-lucide="x" size="12"></i> 취소
+            </button>
+            <button class="btn-danger-sm" style="justify-content:center; background:rgba(16,185,129,0.12); color:var(--success); border-color:rgba(16,185,129,0.4);" onclick="createUser()">
+                <i data-lucide="check" size="12"></i> 생성
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MFA QR Modal -->
+<div id="mfaQrModal" class="simple-modal">
+    <div class="simple-modal-card premium-glass">
+        <div class="inspector-header" style="padding:16px 20px;">
+            <h3 style="color:#fff; margin:0;">MFA 스캔 등록</h3>
+            <button class="icon-btn" onclick="closeMfaQrModal()"><i data-lucide="x"></i></button>
+        </div>
+        <div style="padding:20px; text-align:center;">
+            <p style="font-size:12px; color:var(--dim); margin-bottom:12px;">
+                모바일 인증 앱에서 QR 코드를 스캔해 OTP를 등록하세요.
+            </p>
+            <img id="mfaQrImage" alt="MFA QR" style="width:280px; height:280px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:#fff;" />
+            <p id="mfaQrHint" style="margin-top:10px; font-size:11px; color:var(--dim); word-break:break-all;"></p>
+        </div>
+        <div class="inspector-footer" style="padding:12px 20px;">
+            <button class="btn-glass" style="width:100%;" onclick="closeMfaQrModal(true)">닫기</button>
+        </div>
+    </div>
+</div>
+
 <!-- Inspector Backdrop -->
 <div id="detailBackdrop" class="inspector-backdrop" onclick="closeAllInspectors()"></div>
 
 <script th:inline="javascript">
     const activeSessions = /*[[${activeSessions}]]*/ [];
+    let selectedUserDbId = null;
 
     function showUserDetail(dbId) {
         const row = document.querySelector(`.user-row[data-dbid="${dbId}"]`);
         if (!row) return;
 
         const d = row.dataset;
+        selectedUserDbId = dbId;
         document.getElementById('userInspName').textContent = d.name;
         document.getElementById('userInspId').textContent = "Principal: " + d.id;
         document.getElementById('userInspEmail').textContent = d.email;
@@ -224,13 +310,128 @@
         }
 
         document.getElementById('userInspectorPanel').classList.add('active');
-        document.getElementById('detailBackdrop').classList.add('active');
+        syncBackdropVisibility();
         if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function syncBackdropVisibility() {
+        const shouldShow =
+            document.getElementById('userInspectorPanel').classList.contains('active') ||
+            document.getElementById('sessionInspectorPanel').classList.contains('active') ||
+            document.getElementById('createUserModal').classList.contains('active') ||
+            document.getElementById('mfaQrModal').classList.contains('active');
+        document.getElementById('detailBackdrop').classList.toggle('active', shouldShow);
     }
 
     function closeUserInspector() {
         document.getElementById('userInspectorPanel').classList.remove('active');
-        document.getElementById('detailBackdrop').classList.remove('active');
+        selectedUserDbId = null;
+        syncBackdropVisibility();
+    }
+
+    async function updateUserMfa(enabled) {
+        if (!selectedUserDbId) return;
+        try {
+            const res = await fetch(`/api/users/${selectedUserDbId}/mfa`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            });
+            const data = await res.json();
+            if (!res.ok || data.success === false) {
+                throw new Error(data.message || 'MFA 설정 변경에 실패했습니다.');
+            }
+            if (enabled && data.secretIssued && data.provisioningUri) {
+                openMfaQrModal(selectedUserDbId, data.provisioningUri);
+                return;
+            }
+            if (enabled) {
+                openMfaQrModal(selectedUserDbId, data.provisioningUri || '');
+                return;
+            }
+            alert(data.message || 'MFA 설정이 변경되었습니다.');
+            window.location.reload();
+        } catch (e) {
+            alert(e.message || 'MFA 설정 변경 중 오류가 발생했습니다.');
+        }
+    }
+
+    function openMfaQrModal(userId, provisioningUri) {
+        const img = document.getElementById('mfaQrImage');
+        const hint = document.getElementById('mfaQrHint');
+        img.src = `/api/users/${userId}/mfa/qr?t=${Date.now()}`;
+        hint.textContent = provisioningUri ? `URI: ${provisioningUri}` : '';
+        document.getElementById('mfaQrModal').classList.add('active');
+        syncBackdropVisibility();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeMfaQrModal(reload = false) {
+        document.getElementById('mfaQrModal').classList.remove('active');
+        syncBackdropVisibility();
+        if (reload) {
+            window.location.reload();
+        }
+    }
+
+    function openCreateUserModal() {
+        document.getElementById('createUserModal').classList.add('active');
+        syncBackdropVisibility();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    function closeCreateUserModal() {
+        document.getElementById('createUserModal').classList.remove('active');
+        syncBackdropVisibility();
+    }
+
+    async function createUser() {
+        const username = document.getElementById('createUsername').value.trim();
+        const name = document.getElementById('createName').value.trim();
+        const email = document.getElementById('createEmail').value.trim();
+        const role = document.getElementById('createRole').value;
+        const password = document.getElementById('createPassword').value.trim();
+
+        if (!username) {
+            alert('사용자명을 입력해주세요.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, name, email, role, password })
+            });
+            const data = await res.json();
+            if (!res.ok || data.success === false) {
+                throw new Error(data.message || '계정 생성에 실패했습니다.');
+            }
+            alert(data.message || '계정이 생성되었습니다.');
+            window.location.reload();
+        } catch (e) {
+            alert(e.message || '계정 생성 중 오류가 발생했습니다.');
+        }
+    }
+
+    async function deleteSelectedUser() {
+        if (!selectedUserDbId) return;
+        const confirmed = confirm('선택한 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.');
+        if (!confirmed) return;
+
+        try {
+            const res = await fetch(`/api/users/${selectedUserDbId}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (!res.ok || data.success === false) {
+                throw new Error(data.message || '계정 삭제에 실패했습니다.');
+            }
+            alert(data.message || '계정이 삭제되었습니다.');
+            window.location.reload();
+        } catch (e) {
+            alert(e.message || '계정 삭제 중 오류가 발생했습니다.');
+        }
     }
 
     function openSessionInspector() {
@@ -259,18 +460,20 @@
         }
         
         document.getElementById('sessionInspectorPanel').classList.add('active');
-        document.getElementById('detailBackdrop').classList.add('active');
+        syncBackdropVisibility();
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
     function closeSessionInspector() {
         document.getElementById('sessionInspectorPanel').classList.remove('active');
-        document.getElementById('detailBackdrop').classList.remove('active');
+        syncBackdropVisibility();
     }
 
     function closeAllInspectors() {
         closeSessionInspector();
         closeUserInspector();
+        closeCreateUserModal();
+        closeMfaQrModal();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -425,6 +628,62 @@
 
     .pulse-alive {
         animation: pulse 2s infinite;
+    }
+
+    .simple-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+        padding: 20px;
+    }
+    .simple-modal.active {
+        display: flex;
+    }
+    .simple-modal-card {
+        width: 100%;
+        max-width: 460px;
+        border: 1px solid var(--glass-border);
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .input-dark {
+        width: 100%;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: #fff;
+        border-radius: 8px;
+        padding: 10px 12px;
+        outline: none;
+    }
+    .input-dark:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(0, 242, 255, 0.16);
+    }
+    #createRole option {
+        color: #111;
+    }
+    .btn-neutral-sm {
+        border: 1px solid rgba(239, 68, 68, 0.45);
+        background: rgba(239, 68, 68, 0.12);
+        color: #ffb4b4;
+        cursor: pointer;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: 0.2s;
+    }
+    .btn-neutral-sm:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.65);
+        color: #fff;
     }
 </style>
 

@@ -1,6 +1,8 @@
 package com.example.beacon.config;
 
+import com.example.beacon.repository.UserRepository;
 import com.example.beacon.security.JwtAuthenticationFilter;
+import com.example.beacon.security.MfaEnforcementFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +19,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.time.LocalDateTime;
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -24,7 +28,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
     
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final MfaEnforcementFilter mfaEnforcementFilter;
     private final UserDetailsService userDetailsService;
+    private final UserRepository userRepository;
     
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -32,7 +38,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/login", "/register").permitAll()
+                .requestMatchers("/api/auth/**", "/login", "/register", "/mfa-challenge", "/mfa/verify").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
@@ -40,6 +46,24 @@ public class SecurityConfig {
             )
             .formLogin(form -> form
                 .loginPage("/login")
+                .successHandler((request, response, authentication) -> {
+                    String username = authentication.getName();
+                    userRepository.findByUsername(username).ifPresent(user -> {
+                        user.setLastLoginAt(LocalDateTime.now());
+                        user.setLoginAttempts(0);
+                        user.setLockedUntil(null);
+                        userRepository.save(user);
+                    });
+                    boolean mfaEnabled = userRepository.findByUsername(username)
+                            .map(user -> Boolean.TRUE.equals(user.getMfaEnabled()))
+                            .orElse(false);
+                    request.getSession(true).setAttribute(MfaEnforcementFilter.MFA_VERIFIED_SESSION_KEY, !mfaEnabled);
+                    if (mfaEnabled) {
+                        response.sendRedirect("/mfa-challenge");
+                        return;
+                    }
+                    response.sendRedirect("/dashboard");
+                })
                 .defaultSuccessUrl("/dashboard", true)
                 .permitAll()
             )
@@ -47,7 +71,8 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/login?logout")
                 .permitAll()
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(mfaEnforcementFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
     }

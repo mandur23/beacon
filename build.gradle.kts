@@ -37,6 +37,8 @@ dependencies {
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
     implementation("org.flywaydb:flyway-mysql")
     implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:javase:3.5.3")
     implementation("com.github.oshi:oshi-core:6.7.0")
     implementation("io.jsonwebtoken:jjwt-api:0.12.3")
     implementation("org.springframework.boot:spring-boot-starter-actuator")

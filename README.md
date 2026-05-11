@@ -111,6 +111,14 @@ Windows:
 
 기본 주소: `https://localhost:8080`
 
+Windows HTTPS 자동 실행:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
+```
+
+`start-dev.ps1`는 `mkcert -install`(최초 1회 신뢰 루트 등록), `keystore.p12` 생성, `.env`의 SSL 값 동기화 후 서버를 실행합니다.
+
 ### 4) ML 서비스 실행
 
 ```bash

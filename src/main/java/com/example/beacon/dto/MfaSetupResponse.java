@@ -1,0 +1,13 @@
+package com.example.beacon.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class MfaSetupResponse {
+    private String otpAuthUri;
+    private String secret;
+}

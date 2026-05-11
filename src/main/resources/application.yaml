@@ -1,8 +1,8 @@
 server:
   port: 8080
   ssl:
-    # 기본 false: http:// 접속. HTTPS는 SERVER_SSL_ENABLED=true (또는 .env)
-    enabled: ${SERVER_SSL_ENABLED:false}
+    # 기본 true: https:// 접속. 인증서가 준비되지 않았다면 SERVER_SSL_ENABLED=false 로 일시 전환
+    enabled: ${SERVER_SSL_ENABLED:true}
     key-store: classpath:keystore.p12
     # mkcert -pkcs12 기본 비밀번호는 changeit
     key-store-password: ${SERVER_SSL_KEYSTORE_PASSWORD:changeit}

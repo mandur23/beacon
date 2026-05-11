@@ -10,6 +10,8 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+// 임시 토큰(MFA 대기)은 5분 유효, mfa_pending=true 클레임으로 구분한다.
+
 @Component
 public class JwtTokenProvider {
 
@@ -76,5 +78,38 @@ public class JwtTokenProvider {
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    public String generateTempToken(String username) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject(username)
+                .claim("mfa_pending", true)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + 5 * 60 * 1000L))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public boolean isTempToken(String token) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(getSigningKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return Boolean.TRUE.equals(claims.get("mfa_pending", Boolean.class));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public String getUsernameFromTempToken(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
     }
 }

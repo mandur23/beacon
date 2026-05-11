@@ -14,7 +14,7 @@ Beacon은 **네트워크 경유 트래픽**과 **각 PC의 호스트 정보**를
 ## 1. 사전 요구사항
 
 - **Windows**: [Npcap](https://npcap.com) 설치(로컬 패킷 수집 시). 설치 시 WinPcap API 호환 모드 권장.
-- **Pi(또는 Beacon 서버) 주소**: 예) `http://192.168.0.10:8080`
+- **Pi(또는 Beacon 서버) 주소**: 예) `https://192.168.0.10:8080`
 - 운영 환경에서는 **HTTPS**와 방화벽(포트 8080 등)만 허용 목록으로 제한하는 것을 권장합니다.
 
 ---
@@ -210,7 +210,7 @@ README에 나온 형태를, **실제 API 경로**에 맞춘 예시입니다.
 
 ```yaml
 # BeaconGuardian config.yaml (예시)
-beacon_server: "http://192.168.0.10:8080"
+beacon_server: "https://192.168.0.10:8080"
 
 # API 베이스 (코드는 /api/agents, /api/traffic, /api/security-events)
 auth:

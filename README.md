@@ -27,7 +27,7 @@ Raspberry Pi 허브 + Spring Boot + Suricata + Python ML로 구성된 통합 보
 ## 아키텍처 개요
 
 ```text
-[Client Agents] --(HTTP API)--> [Spring Boot Beacon] --(JPA)--> [MySQL]
+[Client Agents] --(HTTPS API)--> [Spring Boot Beacon] --(JPA)--> [MySQL]
          |                             |
          |                             +--(HTTP)--> [Python ML Service]
          |
@@ -68,7 +68,30 @@ Copy-Item .env.example .env
 - `BEACON_DB_URL`, `BEACON_DB_USERNAME`
 - `ML_SERVICE_URL` (기본 `http://localhost:5000`)
 - `SYSLOG_PORT` (기본 `514`)
-- `SERVER_SSL_ENABLED` (`true` 시 HTTPS 사용)
+- `SERVER_SSL_ENABLED` (기본 `true`, HTTPS 사용)
+- `SERVER_SSL_KEYSTORE_PASSWORD`, `SERVER_SSL_KEY_ALIAS`
+
+HTTPS 기본 기동을 위해 `src/main/resources/keystore.p12`가 필요합니다.
+
+Windows(PowerShell)에서 개발용 인증서 생성:
+
+```powershell
+& "C:\Program Files\Java\jdk-21\bin\keytool.exe" -genkeypair `
+  -alias 1 -keyalg RSA -keysize 2048 -storetype PKCS12 `
+  -keystore "src/main/resources/keystore.p12" `
+  -storepass changeit -keypass changeit -validity 3650 `
+  -dname "CN=localhost, OU=Dev, O=Beacon, L=Seoul, ST=Seoul, C=KR" `
+  -ext "SAN=dns:localhost,ip:127.0.0.1" -noprompt
+```
+
+브라우저 경고를 줄이려면(선택) 현재 사용자 루트 저장소에 인증서 설치:
+
+```powershell
+& "C:\Program Files\Java\jdk-21\bin\keytool.exe" -exportcert -alias 1 `
+  -keystore "src/main/resources/keystore.p12" -storepass changeit -rfc `
+  -file "$env:TEMP\beacon-localhost.cer"
+certutil -user -addstore Root "$env:TEMP\beacon-localhost.cer"
+```
 
 ### 3) 백엔드 실행
 
@@ -86,7 +109,7 @@ Windows:
 .\gradlew.bat bootRun
 ```
 
-기본 주소: `http://localhost:8080`
+기본 주소: `https://localhost:8080`
 
 ### 4) ML 서비스 실행
 

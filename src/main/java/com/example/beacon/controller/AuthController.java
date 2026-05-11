@@ -2,9 +2,12 @@ package com.example.beacon.controller;
 
 import com.example.beacon.dto.AuthResponse;
 import com.example.beacon.dto.LoginRequest;
+import com.example.beacon.dto.MfaSetupResponse;
+import com.example.beacon.dto.MfaVerifyRequest;
 import com.example.beacon.entity.User;
 import com.example.beacon.repository.UserRepository;
 import com.example.beacon.security.JwtTokenProvider;
+import com.example.beacon.service.TotpService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -25,13 +28,16 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
-    
+
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    
+    private final TotpService totpService;
+
     private static final int MAX_LOGIN_ATTEMPTS = 5;
+
+    // ── 로그인 ────────────────────────────────────────────────────────────────
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
@@ -40,18 +46,13 @@ public class AuthController {
         if (user != null) {
             if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
                 log.warn("로그인 시도: 계정 잠금 상태 - username={}", loginRequest.getUsername());
-                Map<String, String> error = new HashMap<>();
-                error.put("message", "계정이 잠겨있습니다. 잠시 후 다시 시도해주세요.");
-                return ResponseEntity.status(423).body(error);
+                return ResponseEntity.status(423).body(Map.of("message", "계정이 잠겨있습니다. 잠시 후 다시 시도해주세요."));
             }
         }
 
         try {
             authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                    loginRequest.getUsername(),
-                    loginRequest.getPassword()
-                )
+                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
             );
 
             user = userRepository.findByUsername(loginRequest.getUsername())
@@ -62,30 +63,28 @@ public class AuthController {
             user.setLockedUntil(null);
             userRepository.save(user);
 
+            // MFA 활성화된 계정이면 임시 토큰 반환 (202 Accepted)
+            if (Boolean.TRUE.equals(user.getMfaEnabled())) {
+                String tempToken = tokenProvider.generateTempToken(user.getUsername());
+                log.info("MFA 인증 대기 - username={}", user.getUsername());
+                return ResponseEntity.status(202).body(Map.of(
+                        "mfaRequired", true,
+                        "tempToken", tempToken
+                ));
+            }
+
             String token = tokenProvider.generateToken(user.getUsername(), user.getId());
+            log.info("로그인 성공 - username={}", user.getUsername());
+            return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getId(), user.getRole()));
 
-            AuthResponse response = new AuthResponse(
-                token,
-                user.getUsername(),
-                user.getId(),
-                user.getRole()
-            );
-
-            log.info("로그인 성공 - username={}", loginRequest.getUsername());
-            return ResponseEntity.ok(response);
-            
         } catch (DisabledException e) {
             log.warn("로그인 실패: 비활성화된 계정 - username={}", loginRequest.getUsername());
-            Map<String, String> error = new HashMap<>();
-            error.put("message", "계정이 비활성화되었습니다. 관리자에게 문의하세요.");
-            return ResponseEntity.status(403).body(error);
-            
+            return ResponseEntity.status(403).body(Map.of("message", "계정이 비활성화되었습니다. 관리자에게 문의하세요."));
+
         } catch (LockedException e) {
             log.warn("로그인 실패: 잠긴 계정 - username={}", loginRequest.getUsername());
-            Map<String, String> error = new HashMap<>();
-            error.put("message", "계정이 잠겨있습니다. 잠시 후 다시 시도해주세요.");
-            return ResponseEntity.status(423).body(error);
-            
+            return ResponseEntity.status(423).body(Map.of("message", "계정이 잠겨있습니다. 잠시 후 다시 시도해주세요."));
+
         } catch (BadCredentialsException e) {
             log.warn("로그인 실패: 잘못된 자격 증명 - username={}", loginRequest.getUsername());
             if (user != null) {
@@ -94,22 +93,119 @@ public class AuthController {
                 if (attempts >= MAX_LOGIN_ATTEMPTS) {
                     user.setEnabled(false);
                     user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
-                    log.warn("계정 잠금 처리 - username={}, attempts={}", loginRequest.getUsername(), attempts);
+                    log.warn("계정 잠금 처리 - username={}, attempts={}", user.getUsername(), attempts);
                 }
                 userRepository.save(user);
             }
-            Map<String, String> error = new HashMap<>();
-            error.put("message", "Invalid username or password");
-            return ResponseEntity.status(401).body(error);
-            
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid username or password"));
+
         } catch (Exception e) {
             log.error("로그인 중 예상치 못한 오류 발생 - username={}", loginRequest.getUsername(), e);
-            Map<String, String> error = new HashMap<>();
-            error.put("message", "로그인 처리 중 오류가 발생했습니다.");
-            return ResponseEntity.status(500).body(error);
+            return ResponseEntity.status(500).body(Map.of("message", "로그인 처리 중 오류가 발생했습니다."));
         }
     }
-    
+
+    // ── MFA: OTP 검증 (임시 토큰 → 정식 JWT 발급) ──────────────────────────
+
+    @PostMapping("/mfa/verify")
+    public ResponseEntity<?> mfaVerify(@RequestBody MfaVerifyRequest request) {
+        String tempToken = request.getTempToken();
+
+        if (!tokenProvider.validateToken(tempToken) || !tokenProvider.isTempToken(tempToken)) {
+            return ResponseEntity.status(401).body(Map.of("message", "유효하지 않거나 만료된 인증 토큰입니다."));
+        }
+
+        String username = tokenProvider.getUsernameFromTempToken(tempToken);
+        User user = userRepository.findByUsername(username).orElse(null);
+
+        if (user == null || user.getMfaSecret() == null) {
+            return ResponseEntity.status(400).body(Map.of("message", "MFA가 설정되지 않은 계정입니다."));
+        }
+
+        if (!totpService.verifyTotp(user.getMfaSecret(), request.getOtpCode())) {
+            log.warn("MFA 검증 실패 - username={}", username);
+            return ResponseEntity.status(401).body(Map.of("message", "OTP 코드가 올바르지 않습니다."));
+        }
+
+        String token = tokenProvider.generateToken(user.getUsername(), user.getId());
+        log.info("MFA 로그인 성공 - username={}", username);
+        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getId(), user.getRole()));
+    }
+
+    // ── MFA: 설정 시작 (secret 생성, QR URI 반환) ───────────────────────────
+
+    @PostMapping("/mfa/setup")
+    public ResponseEntity<?> mfaSetup(@RequestHeader("Authorization") String authHeader) {
+        String username = extractUsername(authHeader);
+        if (username == null) return ResponseEntity.status(401).body(Map.of("message", "인증이 필요합니다."));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String secret = totpService.generateSecret();
+        user.setMfaSecret(secret);
+        userRepository.save(user);
+
+        String uri = totpService.generateOtpAuthUri(username, secret);
+        log.info("MFA 설정 시작 - username={}", username);
+        return ResponseEntity.ok(new MfaSetupResponse(uri, secret));
+    }
+
+    // ── MFA: 활성화 (OTP 코드 확인 후 mfaEnabled = true) ───────────────────
+
+    @PostMapping("/mfa/enable")
+    public ResponseEntity<?> mfaEnable(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody Map<String, String> body) {
+
+        String username = extractUsername(authHeader);
+        if (username == null) return ResponseEntity.status(401).body(Map.of("message", "인증이 필요합니다."));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getMfaSecret() == null) {
+            return ResponseEntity.status(400).body(Map.of("message", "먼저 /mfa/setup을 호출하세요."));
+        }
+
+        if (!totpService.verifyTotp(user.getMfaSecret(), body.get("otpCode"))) {
+            log.warn("MFA 활성화 실패: OTP 불일치 - username={}", username);
+            return ResponseEntity.status(401).body(Map.of("message", "OTP 코드가 올바르지 않습니다."));
+        }
+
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+        log.info("MFA 활성화 완료 - username={}", username);
+        return ResponseEntity.ok(Map.of("message", "MFA가 활성화되었습니다."));
+    }
+
+    // ── MFA: 비활성화 ────────────────────────────────────────────────────────
+
+    @PostMapping("/mfa/disable")
+    public ResponseEntity<?> mfaDisable(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody Map<String, String> body) {
+
+        String username = extractUsername(authHeader);
+        if (username == null) return ResponseEntity.status(401).body(Map.of("message", "인증이 필요합니다."));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!totpService.verifyTotp(user.getMfaSecret(), body.get("otpCode"))) {
+            log.warn("MFA 비활성화 실패: OTP 불일치 - username={}", username);
+            return ResponseEntity.status(401).body(Map.of("message", "OTP 코드가 올바르지 않습니다."));
+        }
+
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        userRepository.save(user);
+        log.info("MFA 비활성화 완료 - username={}", username);
+        return ResponseEntity.ok(Map.of("message", "MFA가 비활성화되었습니다."));
+    }
+
+    // ── 회원가입 ──────────────────────────────────────────────────────────────
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User userRequest) {
         try {
@@ -117,12 +213,11 @@ public class AuthController {
                 log.warn("회원가입 실패: 이미 존재하는 사용자명 - username={}", userRequest.getUsername());
                 return ResponseEntity.badRequest().body(Map.of("message", "Username already exists"));
             }
-            
             if (userRepository.existsByEmail(userRequest.getEmail())) {
                 log.warn("회원가입 실패: 이미 존재하는 이메일 - email={}", userRequest.getEmail());
                 return ResponseEntity.badRequest().body(Map.of("message", "Email already exists"));
             }
-            
+
             User user = User.builder()
                     .username(userRequest.getUsername())
                     .password(passwordEncoder.encode(userRequest.getPassword()))
@@ -133,48 +228,45 @@ public class AuthController {
                     .mfaEnabled(false)
                     .loginAttempts(0)
                     .build();
-            
+
             userRepository.save(user);
-            
             log.info("회원가입 성공 - username={}, email={}", userRequest.getUsername(), userRequest.getEmail());
             return ResponseEntity.ok(Map.of("message", "User registered successfully"));
-            
+
         } catch (Exception e) {
             log.error("회원가입 중 오류 발생 - username={}", userRequest.getUsername(), e);
             return ResponseEntity.status(500).body(Map.of("message", "회원가입 처리 중 오류가 발생했습니다."));
         }
     }
-    
+
+    // ── 토큰 검증 ────────────────────────────────────────────────────────────
+
     @GetMapping("/verify")
     public ResponseEntity<?> verifyToken(@RequestHeader("Authorization") String authHeader) {
         try {
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                log.warn("토큰 검증 실패: 잘못된 Authorization 헤더 형식");
                 return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Invalid authorization header format"));
             }
-            
             String token = authHeader.substring(7);
-            if (tokenProvider.validateToken(token)) {
+            if (tokenProvider.validateToken(token) && !tokenProvider.isTempToken(token)) {
                 String username = tokenProvider.getUsernameFromToken(token);
                 Long userId = tokenProvider.getUserIdFromToken(token);
-                log.debug("토큰 검증 성공 - username={}", username);
-                return ResponseEntity.ok(Map.of(
-                    "valid", true,
-                    "username", username,
-                    "userId", userId
-                ));
+                return ResponseEntity.ok(Map.of("valid", true, "username", username, "userId", userId));
             }
-            
-            log.warn("토큰 검증 실패: 유효하지 않은 토큰");
             return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Invalid token"));
-            
-        } catch (StringIndexOutOfBoundsException e) {
-            log.warn("토큰 검증 실패: 토큰 형식 오류", e);
-            return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Malformed token"));
-            
+
         } catch (Exception e) {
             log.error("토큰 검증 중 예상치 못한 오류 발생", e);
             return ResponseEntity.status(401).body(Map.of("valid", false, "message", "Token verification failed"));
         }
+    }
+
+    // ── 헬퍼 ─────────────────────────────────────────────────────────────────
+
+    private String extractUsername(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) return null;
+        String token = authHeader.substring(7);
+        if (!tokenProvider.validateToken(token) || tokenProvider.isTempToken(token)) return null;
+        return tokenProvider.getUsernameFromToken(token);
     }
 }

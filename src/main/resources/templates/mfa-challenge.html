@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MFA 인증 | 비콘</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    <link rel="stylesheet" th:href="@{/css/main.css}"/>
+</head>
+<body class="login-body">
+<div class="login-wrap">
+    <div class="login-card">
+        <div class="login-card-grid">
+            <section class="login-intro">
+                <span class="login-kicker">비콘 관제센터</span>
+                <h1>마지막 인증 단계로 운영자 계정을 안전하게 보호합니다.</h1>
+                <p>등록된 OTP 인증 앱 코드를 확인해 2차 인증을 완료하세요. 인증이 끝나면 대시보드로 이동합니다.</p>
+                <div class="login-feature-list">
+                    <div class="login-feature"><i class="fas fa-user-shield"></i><span>계정 탈취 위험 감소</span></div>
+                    <div class="login-feature"><i class="fas fa-mobile-screen"></i><span>OTP 앱 기반 추가 검증</span></div>
+                    <div class="login-feature"><i class="fas fa-gauge-high"></i><span>검증 즉시 관제 화면 진입</span></div>
+                </div>
+            </section>
+
+            <section class="login-panel">
+                <div class="login-logo">
+                    <div class="logo-icon-lg">
+                        <i class="fas fa-shield-halved"></i>
+                    </div>
+                    <div class="login-title">MFA VERIFY</div>
+                    <div class="login-sub">2차 인증 코드를 입력하세요</div>
+                </div>
+
+                <div th:if="${param.error}" class="alert alert-error">
+                    <i class="fas fa-circle-exclamation"></i> OTP 코드가 올바르지 않습니다.
+                </div>
+
+                <form th:action="@{/mfa/verify}" method="post" class="login-form">
+                    <div class="form-group">
+                        <label><i class="fas fa-key"></i> OTP 코드</label>
+                        <input type="text" name="otpCode" placeholder="6자리 코드를 입력하세요" required maxlength="6" autocomplete="one-time-code"/>
+                    </div>
+                    <button type="submit" class="btn-login">인증 완료</button>
+                </form>
+
+                <div style="margin-top:12px; text-align:center;">
+                    <a th:href="@{/logout}" style="font-size:12px; color:var(--dim); text-decoration:none;">다른 계정으로 로그인</a>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+</body>
+</html>

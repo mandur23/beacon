@@ -13,11 +13,14 @@
         <div class="ai-summary-pane">
             <div class="ai-pane-header">
                 <div>
-                    <div class="ai-eyebrow"><span class="ai-dot" id="aiStatusDot"></span> Llama 3.2 3B · On-Device AI</div>
+                    <div class="ai-eyebrow"><span class="ai-dot" id="aiStatusDot"></span> <span id="aiModelLabel">On-Device AI</span></div>
                     <div class="ai-title">AI 위험 분석 보고서</div>
                     <div class="ai-sub" id="aiStatusText">상태 확인 중...</div>
                 </div>
                 <div class="ai-actions">
+                    <select id="aiModelSelect" class="ai-select" title="로컬 무료 모델 선택">
+                        <option value="">모델 목록 로딩 중...</option>
+                    </select>
                     <select id="aiSummaryDays" class="ai-select" title="분석 기간">
                         <option value="1">최근 1일</option>
                         <option value="3">최근 3일</option>
@@ -29,11 +32,18 @@
                         <i data-lucide="sparkles" size="14"></i> 위험 요약 생성
                     </button>
                     <button id="aiBootstrapBtn" class="ai-btn" onclick="aiBootstrap()" style="display:none;">
-                        <i data-lucide="download-cloud" size="14"></i> 모델 자동 설치
+                        <i data-lucide="download-cloud" size="14"></i> 모델 다운로드/준비
                     </button>
                 </div>
             </div>
             <div id="aiInstallStatus" class="ai-install-status" style="display:none;"></div>
+            <div id="aiDownloadProgressWrap" class="ai-progress-wrap" style="display:none;">
+                <div class="ai-progress-bar">
+                    <div id="aiDownloadProgressBar" class="ai-progress-fill" style="width:0%;"></div>
+                </div>
+                <div id="aiDownloadProgressText" class="ai-progress-text">0%</div>
+            </div>
+            <div id="aiDownloadLogs" class="ai-download-logs" style="display:none;"></div>
 
             <div id="aiSummaryBody" class="ai-summary-body">
                 <div class="ai-empty">
@@ -407,6 +417,47 @@
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
     }
+    .ai-progress-wrap {
+        margin-bottom: 10px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+    }
+    .ai-progress-bar {
+        height: 8px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(255,255,255,0.08);
+        border: 1px solid var(--glass-border);
+    }
+    .ai-progress-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #00f2ff, #4df3b3);
+        transition: width 0.3s ease;
+    }
+    .ai-progress-text {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: #9be7d4;
+        min-width: 42px;
+        text-align: right;
+    }
+    .ai-download-logs {
+        margin-bottom: 12px;
+        max-height: 140px;
+        overflow-y: auto;
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        background: rgba(0,0,0,0.3);
+        padding: 8px 10px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        line-height: 1.5;
+        color: #b8c6d8;
+        white-space: pre-wrap;
+    }
 
     /* ── 채팅 ── */
     .ai-chat-pane {
@@ -513,6 +564,9 @@
     let aiHistory = [];
     let aiBusy = false;
     let aiStatusTimer = null;
+    let aiModelCatalog = [];
+    let aiLastStatus = null;
+    let aiDesiredModel = null;
 
     function escapeHtml(text) {
         return String(text)
@@ -567,16 +621,52 @@
         return '<p>' + escapeHtml(md).replace(/\n/g, '<br/>') + '</p>';
     }
 
+    async function loadAiCatalog() {
+        const modelSelect = document.getElementById('aiModelSelect');
+        if (!modelSelect) return;
+        try {
+            const res = await fetch('/api/ai/catalog');
+            if (!res.ok) throw new Error('catalog fetch failed');
+            const data = await res.json();
+            aiModelCatalog = Array.isArray(data.models) ? data.models : [];
+            if (aiModelCatalog.length === 0) {
+                modelSelect.innerHTML = '<option value="">사용 가능한 모델 없음</option>';
+                modelSelect.disabled = true;
+                return;
+            }
+            modelSelect.innerHTML = aiModelCatalog.map(m => {
+                const tag = escapeHtml(m.tag || '');
+                const name = escapeHtml(m.name || m.tag || 'Unknown');
+                const size = escapeHtml(m.approxSize || '?');
+                return `<option value="${tag}">${name} (${size})</option>`;
+            }).join('');
+            if (data.currentModel) {
+                modelSelect.value = data.currentModel;
+            }
+            if (!modelSelect.value) {
+                modelSelect.value = aiModelCatalog[0].tag;
+            }
+            aiDesiredModel = modelSelect.value || aiDesiredModel;
+            modelSelect.disabled = false;
+        } catch (e) {
+            modelSelect.innerHTML = '<option value="">모델 목록 조회 실패</option>';
+            modelSelect.disabled = true;
+        }
+    }
+
     // ── 모델 상태 폴링
     async function refreshAiStatus() {
         try {
             const res = await fetch('/api/ai/status');
             if (!res.ok) throw new Error('status fetch failed');
             const data = await res.json();
+            aiLastStatus = data;
             applyAiStatus(data);
             return data;
         } catch (e) {
-            applyAiStatus({ phase: 'ERROR', message: '상태 조회 실패: ' + e.message, ready: false });
+            const fallback = { phase: 'ERROR', message: '상태 조회 실패: ' + e.message, ready: false };
+            aiLastStatus = fallback;
+            applyAiStatus(fallback);
             return null;
         }
     }
@@ -588,6 +678,12 @@
         const sendBtn = document.getElementById('aiChatSend');
         const bootstrapBtn = document.getElementById('aiBootstrapBtn');
         const installStatus = document.getElementById('aiInstallStatus');
+        const progressWrap = document.getElementById('aiDownloadProgressWrap');
+        const progressBar = document.getElementById('aiDownloadProgressBar');
+        const progressText = document.getElementById('aiDownloadProgressText');
+        const logsEl = document.getElementById('aiDownloadLogs');
+        const modelSelect = document.getElementById('aiModelSelect');
+        const modelLabel = document.getElementById('aiModelLabel');
 
         if (!dot || !text) return;
 
@@ -595,10 +691,17 @@
         const ready = !!data.ready;
         const inProgress = !!data.inProgress;
         const privilegedInProgress = !!data.privilegedBootstrapInFlight;
+        const downloadPercent = typeof data.downloadPercent === 'number' ? data.downloadPercent : null;
+        const downloadStep = data.downloadStep || '';
+        const progressLogs = Array.isArray(data.progressLogs) ? data.progressLogs : [];
         const installPhase = phase === 'INSTALLING_OLLAMA' || phase === 'STARTING_SERVER' || phase === 'DOWNLOADING_MODEL';
+        const selectedModel = aiDesiredModel || (modelSelect && modelSelect.value ? modelSelect.value : null);
+        const currentModel = data.model || null;
+        const modelMismatch = !!(selectedModel && currentModel && selectedModel !== currentModel);
 
         dot.classList.remove('ready', 'working', 'error');
-        if (ready) dot.classList.add('ready');
+        if (inProgress || installPhase) dot.classList.add('working');
+        else if (ready) dot.classList.add('ready');
         else if (phase === 'ERROR') dot.classList.add('error');
         else dot.classList.add('working');
 
@@ -613,18 +716,32 @@
         }[phase] || phase;
 
         text.textContent = `${phaseLabel} · ${data.message || ''} (model=${data.model || '?'})`;
+        if (modelLabel) {
+            modelLabel.textContent = `${data.model || 'unknown'} · On-Device AI`;
+        }
+        if (ready && currentModel && (!aiDesiredModel || aiDesiredModel === currentModel)) {
+            aiDesiredModel = currentModel;
+        }
+        if (modelSelect && aiDesiredModel && modelSelect.value !== aiDesiredModel) {
+            modelSelect.value = aiDesiredModel;
+        }
 
-        if (summaryBtn) summaryBtn.disabled = !ready || aiBusy;
-        if (sendBtn)    sendBtn.disabled    = !ready || aiBusy;
+        if (summaryBtn) summaryBtn.disabled = !ready || aiBusy || inProgress || installPhase || modelMismatch;
+        if (sendBtn)    sendBtn.disabled    = !ready || aiBusy || inProgress || installPhase;
         if (bootstrapBtn) {
-            const showBootstrapBtn = phase === 'ERROR' || phase === 'NOT_STARTED' || installPhase || inProgress;
+            const showBootstrapBtn = phase === 'ERROR' || phase === 'NOT_STARTED' || installPhase || inProgress || modelMismatch;
             bootstrapBtn.style.display = showBootstrapBtn ? 'inline-flex' : 'none';
             bootstrapBtn.disabled = inProgress || installPhase;
             if (inProgress || installPhase) {
                 bootstrapBtn.innerHTML = '<i data-lucide="loader-2" size="14"></i> 설치 진행 중...';
+            } else if (modelMismatch) {
+                bootstrapBtn.innerHTML = '<i data-lucide="download-cloud" size="14"></i> 선택 모델 다운로드';
             } else {
-                bootstrapBtn.innerHTML = '<i data-lucide="download-cloud" size="14"></i> 모델 자동 설치';
+                bootstrapBtn.innerHTML = '<i data-lucide="download-cloud" size="14"></i> 모델 다운로드/준비';
             }
+        }
+        if (modelSelect) {
+            modelSelect.disabled = inProgress || installPhase;
         }
 
         if (installStatus) {
@@ -632,10 +749,17 @@
                 installStatus.style.display = 'block';
                 installStatus.className = 'ai-install-status working';
                 let installMsg = `${phaseLabel}. ${data.message || '잠시만 기다려 주세요.'}`;
+                if (downloadStep) {
+                    installMsg += ` / ${downloadStep}`;
+                }
                 if (privilegedInProgress) {
                     installMsg += ' (관리자 권한 설치 진행 중)';
                 }
                 installStatus.innerHTML = `<span class="spinner"></span>${escapeHtml(installMsg)}`;
+            } else if (modelMismatch) {
+                installStatus.style.display = 'block';
+                installStatus.className = 'ai-install-status working';
+                installStatus.textContent = `선택 모델(${selectedModel})이 현재 모델(${currentModel})과 다릅니다. '선택 모델 다운로드'를 눌러 적용하세요.`;
             } else if (phase === 'ERROR') {
                 installStatus.style.display = 'block';
                 installStatus.className = 'ai-install-status error';
@@ -647,12 +771,40 @@
             }
         }
 
+        if (progressWrap && progressBar && progressText) {
+            if (installPhase || inProgress || downloadPercent !== null) {
+                const safePercent = Math.max(0, Math.min(100, downloadPercent ?? 0));
+                progressWrap.style.display = 'grid';
+                progressBar.style.width = `${safePercent}%`;
+                progressText.textContent = `${safePercent}%`;
+            } else {
+                progressWrap.style.display = 'none';
+                progressBar.style.width = '0%';
+                progressText.textContent = '0%';
+            }
+        }
+
+        if (logsEl) {
+            if ((installPhase || inProgress || phase === 'ERROR') && progressLogs.length > 0) {
+                logsEl.style.display = 'block';
+                logsEl.textContent = progressLogs.join('\n');
+                logsEl.scrollTop = logsEl.scrollHeight;
+            } else if (phase === 'READY' && progressLogs.length > 0) {
+                logsEl.style.display = 'block';
+                logsEl.textContent = progressLogs.join('\n');
+                logsEl.scrollTop = logsEl.scrollHeight;
+            } else {
+                logsEl.style.display = 'none';
+                logsEl.textContent = '';
+            }
+        }
+
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
 
-        // 준비 완료까지는 빠르게 폴링, 완료되면 폴링 중단
-        if (!ready && phase !== 'ERROR') {
+        // 설치/다운로드/전환 작업 중에는 phase가 READY여도 폴링을 유지한다.
+        if ((inProgress || installPhase || (!ready && phase !== 'ERROR'))) {
             if (!aiStatusTimer) {
                 aiStatusTimer = setInterval(refreshAiStatus, 3000);
             }
@@ -663,28 +815,67 @@
 
     window.aiBootstrap = async function() {
         const bootstrapBtn = document.getElementById('aiBootstrapBtn');
+        const modelSelect = document.getElementById('aiModelSelect');
+        const selectedModel = modelSelect && modelSelect.value ? modelSelect.value : null;
         try {
             if (bootstrapBtn) {
                 bootstrapBtn.disabled = true;
                 bootstrapBtn.innerHTML = '<i data-lucide="loader-2" size="14"></i> 요청 전송 중...';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
-            const res = await fetch('/api/ai/bootstrap', { method: 'POST' });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const res = await fetch('/api/ai/bootstrap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: selectedModel })
+            });
+            if (!res.ok) {
+                let detail = '';
+                try {
+                    const err = await res.json();
+                    detail = err?.error || err?.message || err?.hint || '';
+                } catch (_) {}
+                throw new Error('HTTP ' + res.status + (detail ? ' - ' + detail : ''));
+            }
+            aiDesiredModel = selectedModel || aiDesiredModel;
             refreshAiStatus();
         } catch (e) {
             alert('자동 설치 트리거 실패: ' + e.message);
             if (bootstrapBtn) {
                 bootstrapBtn.disabled = false;
-                bootstrapBtn.innerHTML = '<i data-lucide="download-cloud" size="14"></i> 모델 자동 설치';
+                bootstrapBtn.innerHTML = '<i data-lucide="download-cloud" size="14"></i> 모델 다운로드/준비';
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
         }
     };
 
+    const modelSelectEl = document.getElementById('aiModelSelect');
+    if (modelSelectEl) {
+        modelSelectEl.addEventListener('change', () => {
+            aiDesiredModel = modelSelectEl.value || null;
+            if (aiLastStatus) {
+                applyAiStatus(aiLastStatus);
+            } else {
+                refreshAiStatus();
+            }
+        });
+    }
+
     // ── 위험 요약 생성
     window.generateAiSummary = async function() {
         if (aiBusy) return;
+        if (aiLastStatus) {
+            const s = aiLastStatus;
+            const phase = s.phase || 'UNKNOWN';
+            const installPhase = phase === 'INSTALLING_OLLAMA' || phase === 'STARTING_SERVER' || phase === 'DOWNLOADING_MODEL';
+            const modelSelect = document.getElementById('aiModelSelect');
+            const desiredModel = aiDesiredModel || (modelSelect && modelSelect.value ? modelSelect.value : null);
+            const currentModel = s.model || null;
+            const modelMismatch = !!(desiredModel && currentModel && desiredModel !== currentModel);
+            if (!s.ready || s.inProgress || installPhase || modelMismatch) {
+                alert('모델 준비가 완료된 뒤 요약을 생성할 수 있습니다. (필요 시 선택 모델 다운로드를 먼저 진행하세요.)');
+                return;
+            }
+        }
         const days = parseInt(document.getElementById('aiSummaryDays').value, 10) || 7;
         const body = document.getElementById('aiSummaryBody');
         const meta = document.getElementById('aiSummaryMeta');
@@ -798,8 +989,13 @@
     };
 
     // 초기 로드
-    document.addEventListener('DOMContentLoaded', refreshAiStatus);
-    if (document.readyState !== 'loading') refreshAiStatus();
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadAiCatalog();
+        await refreshAiStatus();
+    });
+    if (document.readyState !== 'loading') {
+        loadAiCatalog().then(refreshAiStatus);
+    }
 })();
 /*]]>*/
 </script>

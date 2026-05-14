@@ -23,12 +23,35 @@ public interface TrafficLogRepository extends JpaRepository<TrafficLog, Long> {
     @Query("SELECT t FROM TrafficLog t WHERE t.timestamp BETWEEN :startDate AND :endDate")
     List<TrafficLog> findByDateRange(@Param("startDate") LocalDateTime startDate, 
                                      @Param("endDate") LocalDateTime endDate);
+
+    @Query("""
+            SELECT t
+            FROM TrafficLog t
+            WHERE t.timestamp BETWEEN :startDate AND :endDate
+              AND (:agentName IS NULL OR LOWER(t.agentName) = LOWER(:agentName))
+            """)
+    List<TrafficLog> findByDateRangeAndOptionalAgent(@Param("startDate") LocalDateTime startDate,
+                                                     @Param("endDate") LocalDateTime endDate,
+                                                     @Param("agentName") String agentName);
     
     @Query("SELECT SUM(t.bytesTransferred) FROM TrafficLog t WHERE t.timestamp > :since")
     Long getTotalBytesTransferredSince(@Param("since") LocalDateTime since);
     
     @Query("SELECT t FROM TrafficLog t WHERE t.isAnomaly = true AND t.anomalyScore >= :minScore ORDER BY t.anomalyScore DESC")
     List<TrafficLog> findAnomalousTraffic(@Param("minScore") Double minScore);
+
+    @Query("""
+            SELECT t
+            FROM TrafficLog t
+            WHERE t.isAnomaly = true
+              AND t.anomalyScore >= :minScore
+              AND t.timestamp >= :since
+              AND (:agentName IS NULL OR LOWER(t.agentName) = LOWER(:agentName))
+            ORDER BY t.anomalyScore DESC
+            """)
+    List<TrafficLog> findAnomalousTrafficSince(@Param("minScore") Double minScore,
+                                               @Param("since") LocalDateTime since,
+                                               @Param("agentName") String agentName);
     
     @Query("SELECT t.protocol, COUNT(t), SUM(t.bytesTransferred) FROM TrafficLog t GROUP BY t.protocol")
     List<Object[]> getProtocolStatistics();

@@ -69,3 +69,32 @@ src/main/resources/keystore.p12
 ### OS ###
 .DS_Store
 Thumbs.db
+
+### Test artifacts ###
+mfa_test_cookies*.txt
+
+### Runtime artifacts ###
+.runtime/
+
+### Never commit (local/sensitive) ###
+*.class
+*.pid
+*.seed
+*.stackdump
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# Certificates / keys
+*.key
+*.pem
+*.crt
+*.cer
+*.pfx
+*.jks
+
+# Local cookies / session dumps
+cookies*.txt
+session*.txt

@@ -119,6 +119,14 @@ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 
 `start-dev.ps1`는 `mkcert -install`(최초 1회 신뢰 루트 등록), `keystore.p12` 생성, `.env`의 SSL 값 동기화 후 서버를 실행합니다.
 
+Windows AI 서버 내부 실행(권장):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-ai-server.ps1
+```
+
+`start-ai-server.ps1`는 Docker를 사용하지 않고 로컬 Ollama 자동 설치/실행 모드로 동작하며, 모델 다운로드 위치를 프로젝트 내부 `.runtime/ollama`로 고정한 뒤 서버를 실행합니다.
+
 ### 4) ML 서비스 실행
 
 ```bash

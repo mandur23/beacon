@@ -8,9 +8,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
 @SpringBootApplication
@@ -79,26 +82,40 @@ public class BeaconApplication {
         setSystemPropertyIfAbsent("SERVER_SSL_KEY_ALIAS", "1");
 
         String mkcert = resolveMkcertCommand();
-        if (mkcert == null) {
-            System.err.println("[HTTPS] mkcert를 찾지 못했습니다. HTTPS 자동 준비를 건너뜁니다.");
-            return;
+        boolean prepared = false;
+        try {
+            if (mkcert != null) {
+                runCommand(mkcert, "-install");
+                runCommand(
+                        mkcert,
+                        "-pkcs12",
+                        "-p12-file",
+                        keystorePath.toString(),
+                        "localhost",
+                        "127.0.0.1",
+                        "::1"
+                );
+                prepared = true;
+                System.out.println("[HTTPS] mkcert로 로컬 keystore 준비 완료: " + keystorePath);
+            } else {
+                System.err.println("[HTTPS] mkcert를 찾지 못했습니다. keytool fallback을 시도합니다.");
+            }
+        } catch (Exception e) {
+            System.err.println("[HTTPS] mkcert 자동 준비 실패: " + e.getMessage());
         }
 
-        try {
-            runCommand(mkcert, "-install");
-            runCommand(
-                    mkcert,
-                    "-pkcs12",
-                    "-p12-file",
-                    keystorePath.toString(),
-                    "localhost",
-                    "127.0.0.1",
-                    "::1"
-            );
+        if (!prepared) {
+            try {
+                generateKeystoreWithKeytool(keystorePath);
+                prepared = true;
+                System.out.println("[HTTPS] keytool fallback으로 로컬 keystore 준비 완료: " + keystorePath);
+            } catch (Exception keytoolError) {
+                System.err.println("[HTTPS] keytool fallback 실패: " + keytoolError.getMessage());
+            }
+        }
+
+        if (prepared) {
             System.setProperty(HTTPS_PREPARED_FLAG, "true");
-            System.out.println("[HTTPS] 로컬 keystore 준비 완료: " + keystorePath);
-        } catch (Exception e) {
-            System.err.println("[HTTPS] 자동 keystore 준비 실패: " + e.getMessage());
         }
     }
 
@@ -136,6 +153,102 @@ public class BeaconApplication {
             return wingetPath.toString();
         }
         return isWindows() ? "mkcert.exe" : "mkcert";
+    }
+
+    private static void generateKeystoreWithKeytool(Path keystorePath) throws IOException, InterruptedException {
+        String keytool = resolveKeytoolCommand();
+        if (keytool == null) {
+            throw new IllegalStateException("keytool을 찾지 못했습니다. JDK가 설치되어 있는지 확인하세요.");
+        }
+        String password = readConfigValue("SERVER_SSL_KEYSTORE_PASSWORD");
+        if (password.isBlank()) {
+            password = "changeit";
+        }
+        String alias = readConfigValue("SERVER_SSL_KEY_ALIAS");
+        if (alias.isBlank()) {
+            alias = "1";
+        }
+
+        if (Files.exists(keystorePath)) {
+            if (isKeyAliasPresent(keytool, keystorePath, password, alias)) {
+                System.out.println("[HTTPS] 기존 keystore 재사용: " + keystorePath + " (alias=" + alias + ")");
+                return;
+            }
+            Path backupPath = keystorePath.resolveSibling(keystorePath.getFileName() + ".bak");
+            Files.move(keystorePath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("[HTTPS] 기존 keystore를 백업했습니다: " + backupPath);
+        }
+
+        runCommand(
+                keytool,
+                "-genkeypair",
+                "-alias",
+                alias,
+                "-keyalg",
+                "RSA",
+                "-keysize",
+                "2048",
+                "-storetype",
+                "PKCS12",
+                "-keystore",
+                keystorePath.toString(),
+                "-storepass",
+                password,
+                "-keypass",
+                password,
+                "-validity",
+                "3650",
+                "-dname",
+                "CN=localhost, OU=Dev, O=Beacon, L=Seoul, ST=Seoul, C=KR",
+                "-ext",
+                "SAN=dns:localhost,ip:127.0.0.1,ip:0:0:0:0:0:0:0:1",
+                "-noprompt"
+        );
+    }
+
+    private static boolean isKeyAliasPresent(String keytool, Path keystorePath, String password, String alias) {
+        try {
+            Process process = new ProcessBuilder(
+                    keytool,
+                    "-list",
+                    "-storetype",
+                    "PKCS12",
+                    "-keystore",
+                    keystorePath.toString(),
+                    "-storepass",
+                    password,
+                    "-alias",
+                    alias
+            ).redirectErrorStream(true).start();
+
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append('\n');
+                }
+            }
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                return true;
+            }
+            System.err.println("[HTTPS] 기존 keystore alias 검사 실패: " + output.toString().trim());
+            return false;
+        } catch (Exception e) {
+            System.err.println("[HTTPS] 기존 keystore 검사 중 오류: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static String resolveKeytoolCommand() {
+        String javaHome = System.getProperty("java.home");
+        if (javaHome != null && !javaHome.isBlank()) {
+            Path keytoolPath = Paths.get(javaHome, "bin", isWindows() ? "keytool.exe" : "keytool");
+            if (Files.exists(keytoolPath)) {
+                return keytoolPath.toString();
+            }
+        }
+        return isWindows() ? "keytool.exe" : "keytool";
     }
 
     private static boolean isWindows() {

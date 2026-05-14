@@ -73,10 +73,10 @@ ai:
     # (자동 설치는 allow-auto-install=false 이므로 여전히 비활성)
     auto-bootstrap: ${OLLAMA_AUTO_BOOTSTRAP:true}
     docker:
-      # Docker Ollama 컨테이너를 우선 사용한다.
-      enabled: ${OLLAMA_DOCKER_ENABLED:true}
-      # 서버 시작 시 컨테이너를 자동으로 시작/생성한다.
-      auto-start: ${OLLAMA_DOCKER_AUTO_START:true}
+      # 기본은 비활성(로컬 Ollama 우선). 필요 시 환경변수로 활성화.
+      enabled: ${OLLAMA_DOCKER_ENABLED:false}
+      # Docker 사용 시에만 서버 시작 시 컨테이너를 자동 시작/생성한다.
+      auto-start: ${OLLAMA_DOCKER_AUTO_START:false}
       # 재사용할 컨테이너 이름
       container-name: ${OLLAMA_DOCKER_CONTAINER_NAME:beacon-ollama}
       # 사용할 Ollama 이미지

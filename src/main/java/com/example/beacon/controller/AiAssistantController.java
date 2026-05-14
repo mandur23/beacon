@@ -1,7 +1,9 @@
 package com.example.beacon.controller;
 
 import com.example.beacon.entity.SecurityEvent;
+import com.example.beacon.entity.TrafficLog;
 import com.example.beacon.repository.SecurityEventRepository;
+import com.example.beacon.repository.TrafficLogRepository;
 import com.example.beacon.service.OllamaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
  * Llama 3B 기반 AI 어시스턴트 API.
  *
  *  - GET  /api/ai/status      : 모델 준비 상태(설치/다운로드/READY) 조회
+ *  - GET  /api/ai/catalog     : 무료 로컬 모델 추천 목록 조회
  *  - POST /api/ai/bootstrap   : 자동 설치/모델 다운로드 수동 트리거
  *  - POST /api/ai/summary     : 최근 N일 보안 이벤트 위험 요약 생성
  *  - POST /api/ai/chat        : 보안 이벤트 컨텍스트 포함 자유 질의
@@ -33,14 +36,35 @@ public class AiAssistantController {
 
     private final OllamaService ollamaService;
     private final SecurityEventRepository securityEventRepository;
+    private final TrafficLogRepository trafficLogRepository;
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> status() {
         return ResponseEntity.ok(ollamaService.getStatus());
     }
 
+    @GetMapping("/catalog")
+    public ResponseEntity<Map<String, Object>> catalog() {
+        return ResponseEntity.ok(Map.of(
+                "models", ollamaService.getFreeModelCatalog(),
+                "currentModel", ollamaService.getStatus().get("model")
+        ));
+    }
+
     @PostMapping("/bootstrap")
-    public ResponseEntity<Map<String, Object>> bootstrap(Authentication authentication) {
+    public ResponseEntity<Map<String, Object>> bootstrap(
+            @RequestBody(required = false) Map<String, Object> req,
+            Authentication authentication
+    ) {
+        if (req != null && req.get("model") != null) {
+            String requestedModel = String.valueOf(req.get("model"));
+            if (!ollamaService.selectModel(requestedModel)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "지원되지 않거나 현재 적용할 수 없는 모델입니다.",
+                        "hint", "GET /api/ai/catalog 에서 제공된 tag 값만 사용하세요."
+                ));
+            }
+        }
         ollamaService.triggerBootstrap(isAdmin(authentication));
         return ResponseEntity.accepted().body(ollamaService.getStatus());
     }
@@ -131,6 +155,196 @@ public class AiAssistantController {
                 "reply", reply,
                 "model", ollamaService.getStatus().get("model")
         ));
+    }
+
+    /**
+     * 트래픽 이상 패턴 AI 분석.
+     *
+     * 요청 파라미터 (모두 선택):
+     *   hours      - 분석 기간(시간 단위, 기본 24, 최대 168)
+     *   minScore   - 이상 점수 최솟값(기본 0.5)
+     *   agentName  - 특정 에이전트 필터(없으면 전체)
+     *
+     * 반환:
+     *   analysis   - LLM 분석 텍스트 (한국어 마크다운)
+     *   stats       - 컨텍스트에 사용된 집계 통계 요약
+     *   trafficCount / anomalyCount / hours / model / generatedAt
+     */
+    @PostMapping("/traffic-analysis")
+    public ResponseEntity<Map<String, Object>> trafficAnalysis(
+            @RequestBody(required = false) Map<String, Object> req
+    ) {
+        int hours = parseHours(req, 24);
+        double minScore = parseMinScore(req, 0.5);
+        String agentFilter = req != null && req.get("agentName") instanceof String s && !s.isBlank() ? s.trim() : null;
+
+        LocalDateTime since = LocalDateTime.now().minusHours(hours);
+        LocalDateTime now = LocalDateTime.now();
+        List<TrafficLog> recentLogs = trafficLogRepository.findByDateRangeAndOptionalAgent(since, now, agentFilter);
+        List<TrafficLog> anomalies = trafficLogRepository.findAnomalousTrafficSince(minScore, since, agentFilter);
+
+        String context = buildTrafficContext(recentLogs, anomalies, hours, agentFilter);
+
+        List<Map<String, String>> messages = List.of(
+                Map.of("role", "system", "content",
+                        "당신은 한국어로 답변하는 네트워크 트래픽 이상 탐지 전문 분석가입니다.\n" +
+                        "제공된 트래픽 통계와 이상 로그만을 근거로 분석하며, 데이터에 없는 내용은 추측하지 않습니다.\n" +
+                        "출력은 반드시 한국어 마크다운 형식으로 아래 구조를 따르세요:\n\n" +
+                        "## 트래픽 이상 요약\n" +
+                        "- (한 줄 핵심 결론)\n\n" +
+                        "## 주요 이상 패턴 (Top 5)\n" +
+                        "1. **패턴명** — 근거 지표 — 위험도(높음/중간/낮음) — 권장 조치\n\n" +
+                        "## 프로토콜/포트 이상 징후\n" +
+                        "- 항목\n\n" +
+                        "## 의심 출발지 IP\n" +
+                        "| IP | 횟수 | 총 바이트 | 평균 이상점수 | 비고 |\n" +
+                        "|---|---|---|---|---|\n\n" +
+                        "## 즉시 권장 조치\n" +
+                        "- 항목 (담당/우선순위)\n\n" +
+                        "## 추가 모니터링 권고\n" +
+                        "- 항목"),
+                Map.of("role", "user", "content",
+                        "다음은 Beacon SOC가 수집한 최근 " + hours + "시간 트래픽 데이터입니다. " +
+                        (agentFilter != null ? "에이전트 필터: " + agentFilter + ". " : "") +
+                        "이상 패턴과 위협을 분석해 주세요.\n\n" + context)
+        );
+
+        String analysis = ollamaService.chat(messages);
+
+        Map<String, Object> statsSnapshot = buildTrafficStatsSummary(recentLogs, anomalies);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("analysis", analysis);
+        body.put("stats", statsSnapshot);
+        body.put("trafficCount", recentLogs.size());
+        body.put("anomalyCount", anomalies.size());
+        body.put("hours", hours);
+        body.put("agentFilter", agentFilter);
+        body.put("model", ollamaService.getStatus().get("model"));
+        body.put("generatedAt", LocalDateTime.now().toString());
+        return ResponseEntity.ok(body);
+    }
+
+    private String buildTrafficContext(List<TrafficLog> logs, List<TrafficLog> anomalies, int hours, String agentFilter) {
+        if (logs.isEmpty() && anomalies.isEmpty()) {
+            return "(최근 " + hours + "시간 내 수집된 트래픽 데이터 없음)";
+        }
+
+        // 프로토콜 분포
+        Map<String, Long> byProtocol = logs.stream()
+                .collect(Collectors.groupingBy(t -> Optional.ofNullable(t.getProtocol()).orElse("UNKNOWN"), Collectors.counting()));
+
+        // 출발지 IP별 총 바이트
+        Map<String, Long> bytesBySrcIp = logs.stream()
+                .collect(Collectors.groupingBy(t -> Optional.ofNullable(t.getSourceIp()).orElse("-"),
+                        Collectors.summingLong(t -> Optional.ofNullable(t.getBytesTransferred()).orElse(0L))));
+
+        // 목적지 포트 빈도
+        Map<String, Long> byDestPort = logs.stream()
+                .collect(Collectors.groupingBy(t -> String.valueOf(t.getDestinationPort()), Collectors.counting()));
+
+        // 에이전트별 이상 건수
+        Map<String, Long> anomalyByAgent = anomalies.stream()
+                .collect(Collectors.groupingBy(t -> Optional.ofNullable(t.getAgentName()).orElse("unknown"), Collectors.counting()));
+
+        // 전체 트래픽 크기
+        long totalBytes = logs.stream().mapToLong(t -> Optional.ofNullable(t.getBytesTransferred()).orElse(0L)).sum();
+        long totalPackets = logs.stream().mapToLong(t -> Optional.ofNullable(t.getPacketsTransferred()).orElse(0L)).sum();
+        double avgDuration = logs.stream().mapToInt(t -> Optional.ofNullable(t.getDuration()).orElse(0)).average().orElse(0);
+        double avgAnomalyScore = anomalies.stream().mapToDouble(t -> Optional.ofNullable(t.getAnomalyScore()).orElse(0.0)).average().orElse(0);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== 기간 집계 (최근 ").append(hours).append("시간")
+                .append(agentFilter != null ? ", 에이전트=" + agentFilter : "").append(") ===\n");
+        sb.append("- 총 트래픽 로그: ").append(logs.size()).append("건\n");
+        sb.append("- 이상 탐지 로그: ").append(anomalies.size()).append("건");
+        if (!logs.isEmpty()) {
+            sb.append(" (").append(String.format("%.1f%%", anomalies.size() * 100.0 / logs.size())).append(")");
+        }
+        sb.append("\n");
+        sb.append("- 총 전송량: ").append(humanBytes(totalBytes))
+                .append(" / 패킷: ").append(totalPackets).append("개\n");
+        sb.append("- 평균 연결 지속시간: ").append(String.format("%.1f", avgDuration)).append("ms\n");
+        sb.append("- 이상 평균 점수: ").append(String.format("%.3f", avgAnomalyScore)).append("\n");
+        sb.append("- 프로토콜 분포: ").append(topNFormatted(byProtocol, 6)).append("\n");
+        sb.append("- 목적지 포트 Top5: ").append(topNFormatted(byDestPort, 5)).append("\n");
+        sb.append("- 출발지 IP별 전송량 Top5: ").append(topNFormattedBytes(bytesBySrcIp, 5)).append("\n");
+        sb.append("- 에이전트별 이상 건수: ").append(topNFormatted(anomalyByAgent, 5)).append("\n");
+
+        if (!anomalies.isEmpty()) {
+            sb.append("\n=== 고이상점수 트래픽 샘플 (최대 10건) ===\n");
+            anomalies.stream()
+                    .sorted(Comparator.comparingDouble((TrafficLog t) -> Optional.ofNullable(t.getAnomalyScore()).orElse(0.0)).reversed())
+                    .limit(10)
+                    .forEach(t -> {
+                        sb.append("- score=").append(String.format("%.3f", Optional.ofNullable(t.getAnomalyScore()).orElse(0.0)))
+                                .append(" | ").append(safe(t.getProtocol()))
+                                .append(" | src=").append(safe(t.getSourceIp())).append(":").append(t.getSourcePort())
+                                .append(" -> dst=").append(safe(t.getDestinationIp())).append(":").append(t.getDestinationPort())
+                                .append(" | ").append(humanBytes(Optional.ofNullable(t.getBytesTransferred()).orElse(0L)))
+                                .append(" | dur=").append(Optional.ofNullable(t.getDuration()).orElse(0)).append("ms")
+                                .append(" | agent=").append(safe(t.getAgentName()))
+                                .append(" | reason=").append(safe(t.getAnomalyReason()))
+                                .append("\n");
+                    });
+        }
+
+        return sb.toString();
+    }
+
+    private Map<String, Object> buildTrafficStatsSummary(List<TrafficLog> logs, List<TrafficLog> anomalies) {
+        Map<String, Object> stats = new LinkedHashMap<>();
+        stats.put("totalLogs", logs.size());
+        stats.put("anomalyCount", anomalies.size());
+        stats.put("anomalyRate", logs.isEmpty() ? 0 : String.format("%.1f%%", anomalies.size() * 100.0 / logs.size()));
+        stats.put("totalBytes", logs.stream().mapToLong(t -> Optional.ofNullable(t.getBytesTransferred()).orElse(0L)).sum());
+        stats.put("avgAnomalyScore", anomalies.stream().mapToDouble(t -> Optional.ofNullable(t.getAnomalyScore()).orElse(0.0)).average().orElse(0));
+        Map<String, Long> byProtocol = logs.stream()
+                .collect(Collectors.groupingBy(t -> Optional.ofNullable(t.getProtocol()).orElse("UNKNOWN"), Collectors.counting()));
+        stats.put("protocolDistribution", byProtocol);
+        return stats;
+    }
+
+    private int parseHours(Map<String, Object> req, int defaultHours) {
+        if (req == null) return defaultHours;
+        Object v = req.get("hours");
+        if (v instanceof Number n) return Math.max(1, Math.min(168, n.intValue()));
+        if (v instanceof String s) {
+            try { return Math.max(1, Math.min(168, Integer.parseInt(s))); }
+            catch (NumberFormatException ignored) { }
+        }
+        return defaultHours;
+    }
+
+    private double parseMinScore(Map<String, Object> req, double defaultScore) {
+        if (req == null) return defaultScore;
+        Object v = req.get("minScore");
+        if (v instanceof Number n) return Math.max(0.0, Math.min(1.0, n.doubleValue()));
+        if (v instanceof String s) {
+            try { return Math.max(0.0, Math.min(1.0, Double.parseDouble(s))); }
+            catch (NumberFormatException ignored) { }
+        }
+        return defaultScore;
+    }
+
+    private String topNFormattedBytes(Map<String, Long> map, int n) {
+        if (map == null || map.isEmpty()) return "(없음)";
+        return map.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .limit(n)
+                .map(e -> e.getKey() + "(" + humanBytes(e.getValue()) + ")")
+                .collect(Collectors.joining(", "));
+    }
+
+    private String humanBytes(long bytes) {
+        double value = bytes;
+        String[] units = {"B", "KB", "MB", "GB"};
+        int idx = 0;
+        while (value >= 1024 && idx < units.length - 1) {
+            value /= 1024.0;
+            idx++;
+        }
+        return String.format("%.1f%s", value, units[idx]);
     }
 
     private List<Map<String, String>> parseHistory(Object rawHistory) {

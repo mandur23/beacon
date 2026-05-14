@@ -1,5 +1,6 @@
 package com.example.beacon.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,18 +13,26 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 /**
  * Llama 3B 모델 자동 부트스트랩 + 호출 서비스.
@@ -42,6 +51,19 @@ import java.util.concurrent.atomic.AtomicReference;
 @Slf4j
 @Service
 public class OllamaService {
+    private static final int MAX_PROGRESS_LOGS = 40;
+    private static final DateTimeFormatter LOG_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final Pattern MODEL_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_.:-]{2,64}$");
+    private static final List<Map<String, Object>> FREE_MODEL_CATALOG = List.of(
+            modelOption("llama3.2:3b", "Llama 3.2 3B", "~2GB", "균형형 기본 모델 (한국어/영어, 보고서·요약에 적합)"),
+            modelOption("qwen2.5:3b", "Qwen 2.5 3B", "~2GB", "가벼운 추론/요약에 강한 모델"),
+            modelOption("phi3:mini", "Phi-3 Mini", "~2.2GB", "빠른 응답, 경량 환경에 적합"),
+            modelOption("mistral:7b-instruct", "Mistral 7B Instruct", "~4.1GB", "정확도 우선, 여유 메모리 환경에 적합"),
+            modelOption("gemma2:2b", "Gemma 2 2B", "~1.6GB", "저사양 장비에서 구동하기 쉬운 초경량 모델")
+    );
+    private static final Set<String> FREE_MODEL_TAGS = FREE_MODEL_CATALOG.stream()
+            .map(m -> String.valueOf(m.get("tag")))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     public enum Phase {
         NOT_STARTED, CHECKING, INSTALLING_OLLAMA, STARTING_SERVER, DOWNLOADING_MODEL, READY, ERROR
@@ -81,6 +103,7 @@ public class OllamaService {
     private String dockerVolume;
 
     private final RestTemplate restTemplate = buildRestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static RestTemplate buildRestTemplate() {
         SimpleClientHttpRequestFactory rf = new SimpleClientHttpRequestFactory();
@@ -92,6 +115,9 @@ public class OllamaService {
 
     private final AtomicReference<Phase> phase = new AtomicReference<>(Phase.NOT_STARTED);
     private final AtomicReference<String> message = new AtomicReference<>("아직 시작되지 않음");
+    private final AtomicReference<Integer> downloadPercent = new AtomicReference<>(null);
+    private final AtomicReference<String> downloadStep = new AtomicReference<>("");
+    private final List<String> progressLogs = Collections.synchronizedList(new ArrayList<>());
     private volatile boolean bootstrapInFlight = false;
     private volatile boolean privilegedBootstrapInFlight = false;
 
@@ -116,6 +142,7 @@ public class OllamaService {
             log.info("Ollama bootstrap already in progress");
             return;
         }
+        resetDownloadProgress();
         bootstrapInFlight = true;
         privilegedBootstrapInFlight = allowPrivilegedAutoInstall;
         Thread t = new Thread(() -> ensureReady(allowPrivilegedAutoInstall), "ollama-bootstrap");
@@ -173,6 +200,8 @@ public class OllamaService {
 
             phase.set(Phase.READY);
             message.set(model + " 모델 준비 완료");
+            downloadPercent.set(100);
+            downloadStep.set("모델 준비 완료");
             log.info("Ollama service ready (model={})", model);
         } catch (Exception e) {
             log.error("Ollama bootstrap failed", e);
@@ -186,6 +215,7 @@ public class OllamaService {
     private void fail(String msg) {
         phase.set(Phase.ERROR);
         message.set(msg);
+        appendProgressLog("오류: " + msg);
     }
 
     public boolean isReady() {
@@ -200,7 +230,27 @@ public class OllamaService {
         map.put("ready", isReady());
         map.put("inProgress", bootstrapInFlight);
         map.put("privilegedBootstrapInFlight", bootstrapInFlight && privilegedBootstrapInFlight);
+        map.put("downloadPercent", downloadPercent.get());
+        map.put("downloadStep", downloadStep.get());
+        map.put("progressLogs", snapshotProgressLogs());
         return map;
+    }
+
+    public List<Map<String, Object>> getFreeModelCatalog() {
+        return FREE_MODEL_CATALOG;
+    }
+
+    public synchronized boolean selectModel(String requestedModel) {
+        if (requestedModel == null) return false;
+        String normalized = requestedModel.trim().toLowerCase();
+        if (!MODEL_NAME_PATTERN.matcher(normalized).matches()) return false;
+        if (!FREE_MODEL_TAGS.contains(normalized)) return false;
+        if (bootstrapInFlight) return false;
+        this.model = normalized;
+        message.set(normalized + " 모델로 전환됨. 부트스트랩을 시작하세요.");
+        resetDownloadProgress();
+        appendProgressLog("모델 선택: " + normalized);
+        return true;
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -358,18 +408,28 @@ public class OllamaService {
     }
 
     private void pullModel() throws Exception {
+        appendProgressLog("다운로드 시작: " + model);
+        downloadPercent.set(0);
+        downloadStep.set("모델 다운로드 요청 중");
+
         // HTTP API 우선 사용
         try {
-            Map<String, Object> body = Map.of("name", model, "stream", false);
-            restTemplate.postForEntity(URI.create(baseUrl + "/api/pull"), body, Map.class);
-            log.info("Model {} pulled via HTTP API", model);
+            pullModelViaHttpStream();
+            downloadPercent.set(100);
+            downloadStep.set("다운로드 완료");
+            appendProgressLog("다운로드 완료: " + model);
+            log.info("Model {} pulled via HTTP stream API", model);
             return;
         } catch (Exception e) {
             log.warn("HTTP pull failed ({}). Falling back to CLI 'ollama pull'.", e.getMessage());
+            appendProgressLog("HTTP 스트림 실패, CLI 방식으로 전환: " + e.getMessage());
         }
 
         if (tryPullModelViaDocker()) {
             log.info("Model {} pulled via docker exec", model);
+            downloadPercent.set(100);
+            downloadStep.set("다운로드 완료");
+            appendProgressLog("다운로드 완료(docker): " + model);
             return;
         }
 
@@ -377,10 +437,78 @@ public class OllamaService {
         ProcessBuilder pb = new ProcessBuilder(resolveOllamaCommand(), "pull", model);
         pb.redirectErrorStream(true);
         Process p = pb.start();
-        consumeAsync(p);
+        consumeAsyncWithProgress(p, "ollama");
         int code = p.waitFor();
         if (code != 0) {
             throw new RuntimeException("ollama pull failed with code " + code);
+        }
+        downloadPercent.set(100);
+        downloadStep.set("다운로드 완료");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void pullModelViaHttpStream() throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) URI.create(baseUrl + "/api/pull").toURL().openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setConnectTimeout((int) Duration.ofSeconds(10).toMillis());
+        conn.setReadTimeout((int) Duration.ofMinutes(20).toMillis());
+        conn.setDoOutput(true);
+
+        String payload = objectMapper.writeValueAsString(Map.of("name", model, "stream", true));
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(payload.getBytes(StandardCharsets.UTF_8));
+        }
+
+        int statusCode = conn.getResponseCode();
+        InputStream responseStream = statusCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
+        if (responseStream == null) {
+            throw new IOException("ollama /api/pull 응답이 비어 있습니다 (HTTP " + statusCode + ")");
+        }
+
+        if (statusCode < 200 || statusCode >= 300) {
+            String errorBody = new String(responseStream.readAllBytes(), StandardCharsets.UTF_8);
+            throw new IOException("ollama /api/pull 실패 (HTTP " + statusCode + "): " + errorBody);
+        }
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(responseStream, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                Map<String, Object> event = objectMapper.readValue(trimmed, Map.class);
+                handlePullProgressEvent(event);
+            }
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private void handlePullProgressEvent(Map<String, Object> event) {
+        Object error = event.get("error");
+        if (error != null) {
+            throw new RuntimeException("모델 다운로드 오류: " + error);
+        }
+
+        String status = String.valueOf(event.getOrDefault("status", "진행 중"));
+        Long completed = toLong(event.get("completed"));
+        Long total = toLong(event.get("total"));
+
+        if (total != null && total > 0 && completed != null && completed >= 0) {
+            int percent = (int) Math.min(99, (completed * 100) / total);
+            downloadPercent.set(percent);
+            downloadStep.set(status + " (" + percent + "%)");
+            appendProgressLog(status + " - " + humanBytes(completed) + " / " + humanBytes(total) + " (" + percent + "%)");
+        } else {
+            downloadStep.set(status);
+            appendProgressLog(status);
+        }
+
+        if ("success".equalsIgnoreCase(status) || status.toLowerCase().contains("done")) {
+            downloadPercent.set(100);
+            downloadStep.set("다운로드 완료");
         }
     }
 
@@ -522,6 +650,19 @@ public class OllamaService {
         if (dockerVolume != null && !dockerVolume.isBlank()) {
             return dockerVolume.trim();
         }
+        // 기본값: 프로젝트 내부 .runtime/ollama 디렉터리를 모델 저장소로 사용한다.
+        // (요구사항: 서버 내부 실행 시 다운로드 위치를 프로젝트 안으로 고정)
+        String projectDir = System.getProperty("user.dir");
+        if (projectDir != null && !projectDir.isBlank()) {
+            try {
+                Path runtimeDir = Path.of(projectDir, ".runtime", "ollama").toAbsolutePath().normalize();
+                Files.createDirectories(runtimeDir);
+                String normalized = runtimeDir.toString().replace("\\", "/");
+                return normalized + ":/root/.ollama";
+            } catch (Exception e) {
+                log.warn("Failed to prepare project-local Ollama volume. Falling back to user-home path: {}", e.getMessage());
+            }
+        }
         String userHome = System.getProperty("user.home");
         if (userHome == null || userHome.isBlank()) {
             return null;
@@ -606,5 +747,84 @@ public class OllamaService {
         }, "ollama-stdout");
         t.setDaemon(true);
         t.start();
+    }
+
+    private void consumeAsyncWithProgress(Process p, String prefix) {
+        Thread t = new Thread(() -> {
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (!trimmed.isEmpty()) {
+                        appendProgressLog(prefix + ": " + trimmed);
+                    }
+                    log.debug("[{}] {}", prefix, line);
+                }
+            } catch (IOException ignored) {
+            }
+        }, "ollama-progress");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void resetDownloadProgress() {
+        downloadPercent.set(null);
+        downloadStep.set("");
+        synchronized (progressLogs) {
+            progressLogs.clear();
+        }
+    }
+
+    private void appendProgressLog(String line) {
+        if (line == null || line.isBlank()) {
+            return;
+        }
+        String timestamped = "[" + LocalTime.now().format(LOG_TIME_FORMATTER) + "] " + line;
+        synchronized (progressLogs) {
+            progressLogs.add(timestamped);
+            if (progressLogs.size() > MAX_PROGRESS_LOGS) {
+                progressLogs.remove(0);
+            }
+        }
+    }
+
+    private List<String> snapshotProgressLogs() {
+        synchronized (progressLogs) {
+            return new ArrayList<>(progressLogs);
+        }
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+        if (value instanceof String s) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String humanBytes(long bytes) {
+        double value = bytes;
+        String[] units = {"B", "KB", "MB", "GB"};
+        int idx = 0;
+        while (value >= 1024 && idx < units.length - 1) {
+            value /= 1024.0;
+            idx++;
+        }
+        return String.format("%.1f%s", value, units[idx]);
+    }
+
+    private static Map<String, Object> modelOption(String tag, String name, String approxSize, String note) {
+        Map<String, Object> option = new LinkedHashMap<>();
+        option.put("tag", tag);
+        option.put("name", name);
+        option.put("approxSize", approxSize);
+        option.put("note", note);
+        return Collections.unmodifiableMap(option);
     }
 }

@@ -58,6 +58,32 @@ ml:
     service:
       url: ${ML_SERVICE_URL:http://localhost:5000}
 
+# Llama 3B (Ollama) 어시스턴트 설정
+ai:
+  ollama:
+    # Ollama 데몬 엔드포인트. 기본값은 로컬 (Ollama 표준 포트 11434).
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    # 사용할 모델 태그. 기본은 Llama 3.2 3B (한국어 지원, 약 2GB).
+    model: ${OLLAMA_MODEL:llama3.2:3b}
+    # 기본 false 권장: 미설치 시 서버에서 외부 스크립트를 직접 실행하지 않도록 차단.
+    auto-install: ${OLLAMA_AUTO_INSTALL:false}
+    # 자동 설치를 실제로 허용할지 여부 (운영 환경은 false 유지 권장).
+    allow-auto-install: ${OLLAMA_ALLOW_AUTO_INSTALL:false}
+    # 설치가 완료된 환경에서는 서버 시작 시 모델 준비를 자동으로 시작한다.
+    # (자동 설치는 allow-auto-install=false 이므로 여전히 비활성)
+    auto-bootstrap: ${OLLAMA_AUTO_BOOTSTRAP:true}
+    docker:
+      # Docker Ollama 컨테이너를 우선 사용한다.
+      enabled: ${OLLAMA_DOCKER_ENABLED:true}
+      # 서버 시작 시 컨테이너를 자동으로 시작/생성한다.
+      auto-start: ${OLLAMA_DOCKER_AUTO_START:true}
+      # 재사용할 컨테이너 이름
+      container-name: ${OLLAMA_DOCKER_CONTAINER_NAME:beacon-ollama}
+      # 사용할 Ollama 이미지
+      image: ${OLLAMA_DOCKER_IMAGE:ollama/ollama:latest}
+      # 비워두면 기본값(USER_HOME/.ollama:/root/.ollama)을 사용한다.
+      volume: ${OLLAMA_DOCKER_VOLUME:}
+
 syslog:
   port: ${SYSLOG_PORT:514}
   protocol: UDP

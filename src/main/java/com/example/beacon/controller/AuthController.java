@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -36,6 +37,9 @@ public class AuthController {
     private final TotpService totpService;
 
     private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final int MAX_MFA_VERIFY_ATTEMPTS = 5;
+    private static final int MFA_VERIFY_LOCK_MINUTES = 5;
+    private final ConcurrentHashMap<String, MfaVerifyAttemptState> mfaVerifyAttempts = new ConcurrentHashMap<>();
 
     // ── 로그인 ────────────────────────────────────────────────────────────────
 
@@ -122,10 +126,26 @@ public class AuthController {
             return ResponseEntity.status(400).body(Map.of("message", "MFA가 설정되지 않은 계정입니다."));
         }
 
-        if (!totpService.verifyTotp(user.getMfaSecret(), request.getOtpCode())) {
-            log.warn("MFA 검증 실패 - username={}", username);
-            return ResponseEntity.status(401).body(Map.of("message", "OTP 코드가 올바르지 않습니다."));
+        MfaVerifyAttemptState attemptState = mfaVerifyAttempts.computeIfAbsent(username, k -> new MfaVerifyAttemptState());
+        synchronized (attemptState) {
+            if (attemptState.lockedUntil != null && attemptState.lockedUntil.isAfter(LocalDateTime.now())) {
+                return ResponseEntity.status(429).body(Map.of("message", "OTP 시도 횟수가 많아 잠시 후 다시 시도해주세요."));
+            }
+
+            if (!totpService.verifyTotp(user.getMfaSecret(), request.getOtpCode())) {
+                attemptState.failCount++;
+                if (attemptState.failCount >= MAX_MFA_VERIFY_ATTEMPTS) {
+                    attemptState.failCount = 0;
+                    attemptState.lockedUntil = LocalDateTime.now().plusMinutes(MFA_VERIFY_LOCK_MINUTES);
+                    log.warn("MFA 검증 잠금 처리 - username={}", username);
+                    return ResponseEntity.status(429).body(Map.of("message", "OTP 시도 횟수가 많아 5분간 잠겼습니다."));
+                }
+                log.warn("MFA 검증 실패 - username={}, failCount={}", username, attemptState.failCount);
+                return ResponseEntity.status(401).body(Map.of("message", "OTP 코드가 올바르지 않습니다."));
+            }
         }
+
+        mfaVerifyAttempts.remove(username);
 
         String token = tokenProvider.generateToken(user.getUsername(), user.getId());
         log.info("MFA 로그인 성공 - username={}", username);
@@ -268,5 +288,10 @@ public class AuthController {
         String token = authHeader.substring(7);
         if (!tokenProvider.validateToken(token) || tokenProvider.isTempToken(token)) return null;
         return tokenProvider.getUsernameFromToken(token);
+    }
+
+    private static class MfaVerifyAttemptState {
+        private int failCount = 0;
+        private LocalDateTime lockedUntil;
     }
 }

@@ -34,6 +34,13 @@ public class MfaEnforcementFilter extends OncePerRequestFilter {
             return;
         }
 
+        HttpSession session = request.getSession(false);
+        // JWT 기반 API 인증은 세션이 없을 수 있으므로 별도 MFA 흐름(임시 토큰 -> OTP 검증)을 그대로 사용한다.
+        if (session == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         boolean mfaEnabled = userRepository.findByUsername(authentication.getName())
                 .map(user -> Boolean.TRUE.equals(user.getMfaEnabled()))
                 .orElse(false);
@@ -42,7 +49,6 @@ public class MfaEnforcementFilter extends OncePerRequestFilter {
             return;
         }
 
-        HttpSession session = request.getSession(false);
         boolean mfaVerified = session != null && Boolean.TRUE.equals(session.getAttribute(MFA_VERIFIED_SESSION_KEY));
         if (mfaVerified) {
             filterChain.doFilter(request, response);
@@ -55,6 +61,13 @@ public class MfaEnforcementFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (path.startsWith("/api/")) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"message\":\"MFA verification required\"}");
+            return;
+        }
+
         response.sendRedirect("/mfa-challenge");
     }
 
@@ -63,7 +76,6 @@ public class MfaEnforcementFilter extends OncePerRequestFilter {
                 || "/mfa/verify".equals(path)
                 || "/logout".equals(path)
                 || "/error".equals(path)
-                || path.startsWith("/api/")
                 || path.startsWith("/css/")
                 || path.startsWith("/js/")
                 || path.startsWith("/images/")

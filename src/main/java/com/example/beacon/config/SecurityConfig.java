@@ -6,6 +6,7 @@ import com.example.beacon.security.MfaEnforcementFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -40,8 +41,25 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/login", "/register", "/mfa-challenge", "/mfa/verify").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                .requestMatchers("/error", "/error/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
+                .requestMatchers("/access", "/firewall", "/policies/**", "/agents").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("ADMIN", "OPERATOR", "ANALYST", "VIEWER", "USER")
+                .requestMatchers(HttpMethod.POST, "/api/firewall/**").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.POST, "/api/event-blocking-policies/**").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.POST, "/api/traffic/block", "/api/traffic/kill-process").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.POST, "/api/threats/*/block").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.POST, "/api/threats/*/investigate").hasAnyRole("ADMIN", "OPERATOR", "ANALYST")
+                .requestMatchers(HttpMethod.POST, "/api/ml/train-model").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.POST, "/api/ai/bootstrap").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/ai/**").hasAnyRole("ADMIN", "OPERATOR", "ANALYST", "VIEWER", "USER")
+                .requestMatchers(HttpMethod.PUT, "/api/security-events/*/resolve").hasAnyRole("ADMIN", "OPERATOR", "ANALYST")
+                .requestMatchers(HttpMethod.PUT, "/api/traffic/*/mark-anomaly").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.PUT, "/api/firewall/**").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.PUT, "/api/event-blocking-policies/**").hasAnyRole("ADMIN", "OPERATOR")
+                .requestMatchers(HttpMethod.PUT, "/api/agents/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/firewall/**", "/api/event-blocking-policies/**", "/api/agents/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
@@ -68,8 +86,15 @@ public class SecurityConfig {
                 .permitAll()
             )
             .logout(logout -> logout
+                .logoutUrl("/logout")
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("JSESSIONID")
                 .logoutSuccessUrl("/login?logout")
                 .permitAll()
+            )
+            .exceptionHandling(exception -> exception
+                .accessDeniedPage("/error/403")
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(mfaEnforcementFilter, UsernamePasswordAuthenticationFilter.class);

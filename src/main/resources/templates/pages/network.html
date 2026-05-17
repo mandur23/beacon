@@ -23,6 +23,9 @@
     <a th:href="@{/network(tab='topology')}" th:class="'nav-item ' + (${tab == 'topology'} ? 'active' : '')">
         <i data-lucide="share-2"></i> 인프라 토폴로지
     </a>
+    <a th:href="@{/network(tab='globe')}" th:class="'nav-item ' + (${tab == 'globe'} ? 'active' : '')">
+        <i data-lucide="globe"></i> 글로벌 트래픽 (Live)
+    </a>
     <a th:href="@{/network(tab='traffic')}" th:class="'nav-item ' + (${tab == 'traffic'} ? 'active' : '')">
         <i data-lucide="zap"></i> 트래픽 분석 (Real-time)
     </a>
@@ -70,6 +73,133 @@
             </div>
         </div>
     </div>
+</th:block>
+
+<!-- Tab Content: Global Network Globe (Live) -->
+<th:block th:if="${tab == 'globe'}">
+    <div class="globe-shell premium-glass">
+        <header class="globe-top">
+            <div class="globe-brand">
+                <div class="globe-mark">
+                    <span class="globe-mark-dot"></span>
+                    <span class="globe-mark-ring"></span>
+                </div>
+                <div>
+                    <div class="globe-brand-name">BEACON</div>
+                    <div class="globe-brand-sub">GLOBAL NETWORK · REAL-TIME MONITOR</div>
+                </div>
+            </div>
+            <div class="globe-top-meta">
+                <div class="globe-stat">
+                    <div class="lbl">STATUS</div>
+                    <div class="val accent"><span class="live-dot"></span>LIVE</div>
+                </div>
+                <div class="globe-stat">
+                    <div class="lbl">ACTIVE LINKS</div>
+                    <div class="val accent" id="gActiveLinks">00</div>
+                </div>
+                <div class="globe-stat">
+                    <div class="lbl">LIVE NOW</div>
+                    <div class="val live-now" id="gLiveLinks">00</div>
+                </div>
+                <div class="globe-stat">
+                    <div class="lbl">THROUGHPUT</div>
+                    <div class="val" id="gThroughput">— b/s</div>
+                </div>
+                <div class="globe-stat">
+                    <div class="lbl">THREATS</div>
+                    <div class="val danger" id="gThreats">00</div>
+                </div>
+            </div>
+        </header>
+
+        <main class="globe-stage" id="globeStage">
+            <div class="bracket tl"></div>
+            <div class="bracket tr"></div>
+            <div class="bracket bl"></div>
+            <div class="bracket br"></div>
+
+            <div class="drag-hint" id="dragHint">
+                <span>드래그하여 회전</span>
+                <span class="sep">·</span>
+                <span>DRAG TO ROTATE</span>
+            </div>
+
+            <aside class="rail left">
+                <div class="rail-card">
+                    <div class="rail-eye">LEGEND</div>
+                    <div class="rail-legend"><span class="swatch" style="background:#00f2ff"></span>정상</div>
+                    <div class="rail-legend"><span class="swatch" style="background:#f59e0b"></span>경고</div>
+                    <div class="rail-legend"><span class="swatch" style="background:#ef4444"></span>위협</div>
+                    <div class="rail-legend"><span class="swatch" style="background:#c084fc"></span>행위 분석</div>
+                </div>
+                <div class="rail-card">
+                    <div class="rail-eye">TELEMETRY</div>
+                    <div class="rail-row"><span class="k">Window</span><span class="v" id="gTelWindow">5 min</span></div>
+                    <div class="rail-row"><span class="k">Cities</span><span class="v" id="gTelNodes">0</span></div>
+                    <div class="rail-row"><span class="k">Updated</span><span class="v" id="gTelUpdated">--:--:--</span></div>
+                    <div class="rail-row"><span class="k">Last seen</span><span class="v last-seen" id="gLastSeen" data-state="stale">—</span></div>
+                </div>
+            </aside>
+
+            <svg id="globeSvg" class="globe-svg" viewBox="-400 -400 800 800"
+                 xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                    <radialGradient id="oceanGrad" cx="38%" cy="32%" r="80%">
+                        <stop offset="0%"  stop-color="#0b2236" stop-opacity="0.95"/>
+                        <stop offset="55%" stop-color="#06121f" stop-opacity="0.9"/>
+                        <stop offset="100%" stop-color="#03070d" stop-opacity="1"/>
+                    </radialGradient>
+                    <radialGradient id="atmoGrad" cx="50%" cy="50%" r="50%">
+                        <stop offset="80%" stop-color="rgba(0,242,255,0)"/>
+                        <stop offset="92%" stop-color="rgba(0,242,255,0.25)"/>
+                        <stop offset="100%" stop-color="rgba(0,242,255,0)"/>
+                    </radialGradient>
+                    <radialGradient id="terminator" cx="65%" cy="65%" r="60%">
+                        <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+                        <stop offset="100%" stop-color="rgba(0,0,0,0.55)"/>
+                    </radialGradient>
+                </defs>
+                <circle cx="0" cy="0" r="330" fill="url(#atmoGrad)"/>
+                <circle cx="0" cy="0" r="300" fill="url(#oceanGrad)"/>
+                <g id="g-graticule-back"></g>
+                <circle cx="0" cy="0" r="300" class="horizon-glow"/>
+                <g id="g-land-back"></g>
+                <g id="g-graticule-front"></g>
+                <g id="g-land-front"></g>
+                <circle cx="0" cy="0" r="300" fill="url(#terminator)"/>
+                <circle cx="0" cy="0" r="300" class="horizon-ring"/>
+                <g id="g-arcs"></g>
+                <g id="g-nodes"></g>
+                <g id="g-packets"></g>
+            </svg>
+            <div id="globeLabels" class="globe-labels"></div>
+
+            <aside class="rail right">
+                <div class="rail-card">
+                    <div class="rail-eye">TOP LINKS</div>
+                    <div id="gTopLinks" class="rail-toplinks">
+                        <div class="item">데이터 없음</div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <footer class="globe-bottom">
+            <div class="log-title"><span class="lc">●</span>CONNECTION LOG · last <span id="gWindow">5</span>m</div>
+            <div class="log">
+                <div class="log-strip" id="gLogStrip">
+                    <span class="log-item dim">waiting for live traffic...</span>
+                </div>
+            </div>
+            <div class="globe-clock" id="gClock">--:--:--</div>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/d3-array@3/dist/d3-array.min.js"></script>
+    <script src="https://unpkg.com/d3-geo@3/dist/d3-geo.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3/dist/topojson-client.min.js"></script>
+    <script th:src="@{/js/network-globe.js}"></script>
 </th:block>
 
 <!-- Tab Content: Traffic Intelligence -->
@@ -617,6 +747,127 @@ function focusNode(id) { console.log("Focus:", id); }
     .segmented-nav { display: flex; gap: 4px; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 12px; border: 1px solid var(--glass-border); width: fit-content; }
     .nav-item { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; color: var(--dim); text-decoration: none; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
     .nav-item.active { background: var(--accent); color: #000; box-shadow: 0 0 15px var(--accent-glow); }
+
+    /* === BEACON GLOBE STYLES === */
+    .globe-shell { display:grid; grid-template-rows: auto 1fr auto; gap:14px; padding:18px; min-height:680px; background:linear-gradient(180deg, rgba(12,22,40,0.6), rgba(2,6,17,0.7)); border:1px solid rgba(0,242,255,0.10); border-radius:18px; position:relative; overflow:hidden; }
+    .globe-shell::before { content:''; position:absolute; inset:0; background: radial-gradient(circle at 20% 0%, rgba(0,242,255,0.08), transparent 55%), radial-gradient(circle at 90% 100%, rgba(255,61,90,0.07), transparent 55%); pointer-events:none; }
+
+    .globe-top { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:0 6px; position:relative; z-index:2; }
+    .globe-brand { display:flex; align-items:center; gap:14px; }
+    .globe-mark { position:relative; width:38px; height:38px; display:flex; align-items:center; justify-content:center; }
+    .globe-mark-dot { position:absolute; width:10px; height:10px; border-radius:50%; background:#00f2ff; box-shadow:0 0 14px #00f2ff; }
+    .globe-mark-ring { position:absolute; width:38px; height:38px; border-radius:50%; border:1px solid rgba(0,242,255,0.45); animation: gMarkPulse 2.4s ease-out infinite; }
+    @keyframes gMarkPulse { 0% { transform:scale(0.55); opacity:0.9; } 100% { transform:scale(1.4); opacity:0; } }
+    .globe-brand-name { font-size:14px; font-weight:800; letter-spacing:0.18em; color:#cfeaff; }
+    .globe-brand-sub { font-size:10px; color:rgba(207,234,255,0.55); letter-spacing:0.16em; text-transform:uppercase; }
+
+    .globe-top-meta { display:flex; gap:22px; align-items:center; }
+    .globe-stat { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; }
+    .globe-stat .lbl { font-size:9px; color:rgba(207,234,255,0.55); letter-spacing:0.18em; }
+    .globe-stat .val { font-family:'JetBrains Mono', monospace; font-size:14px; color:#fff; font-weight:600; margin-top:4px; }
+    .globe-stat .val.accent { color:#00f2ff; text-shadow:0 0 10px rgba(0,242,255,0.5); }
+    .globe-stat .val.danger { color:#ef4444; text-shadow:0 0 10px rgba(239,68,68,0.5); }
+    .live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 10px #10b981; margin-right:6px; vertical-align:middle; animation: livepulse 1.4s ease-in-out infinite; }
+    @keyframes livepulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+    .globe-stage { position:relative; display:grid; place-items:center; min-height:540px; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; overflow:hidden; border-radius:14px; background: radial-gradient(circle at 50% 45%, rgba(0,242,255,0.05), transparent 60%); }
+    body.dragging .globe-stage, body.dragging .globe-stage * { cursor:grabbing !important; }
+    .globe-svg { width: min(64vh, 100%, 720px); height: auto; max-height:640px; display:block; overflow:visible; }
+    .horizon-ring { fill:none; stroke:rgba(0,242,255,0.5); stroke-width:1.2; filter: drop-shadow(0 0 8px rgba(0,242,255,0.4)); }
+    .horizon-glow { fill:none; stroke:rgba(0,242,255,0.18); stroke-width:12; }
+    .arc { fill:none; stroke-linecap:round; opacity:0.85; filter: drop-shadow(0 0 4px currentColor); }
+    .node { filter: drop-shadow(0 0 6px currentColor); }
+    .packet { filter: drop-shadow(0 0 10px currentColor); }
+
+    .bracket { position:absolute; width:24px; height:24px; border:1px solid rgba(0,242,255,0.55); pointer-events:none; }
+    .bracket.tl { top:14px; left:14px; border-right:none; border-bottom:none; }
+    .bracket.tr { top:14px; right:14px; border-left:none; border-bottom:none; }
+    .bracket.bl { bottom:14px; left:14px; border-right:none; border-top:none; }
+    .bracket.br { bottom:14px; right:14px; border-left:none; border-top:none; }
+
+    .drag-hint { position:absolute; bottom:18px; left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; padding:6px 14px; border:1px solid rgba(0,242,255,0.25); border-radius:999px; background:rgba(15,23,42,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.16em; color:rgba(207,234,255,0.7); pointer-events:none; transition:opacity 0.6s ease; z-index:5; white-space:nowrap; }
+    .drag-hint.hide { opacity:0; }
+    .drag-hint .sep { color:rgba(207,234,255,0.35); }
+
+    .rail { position:absolute; top:50%; transform:translateY(-50%); width:200px; pointer-events:auto; z-index:3; }
+    .rail.left { left:18px; }
+    .rail.right { right:18px; }
+    .rail-card { background:rgba(15,23,42,0.45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+    .rail-eye { font-size:9px; letter-spacing:0.22em; color:#00f2ff; text-transform:uppercase; margin-bottom:8px; font-weight:700; }
+    .rail-row { display:flex; justify-content:space-between; align-items:center; font-family:'JetBrains Mono', monospace; font-size:11px; padding:3px 0; }
+    .rail-row .k { color:rgba(207,234,255,0.55); }
+    .rail-row .v { color:#fff; }
+    .rail-legend { display:flex; align-items:center; gap:8px; font-size:11px; padding:3px 0; color:rgba(207,234,255,0.7); }
+    .rail-legend .swatch { width:10px; height:10px; border-radius:50%; box-shadow:0 0 8px currentColor; }
+    .rail-toplinks { display:flex; flex-direction:column; gap:6px; max-height:220px; overflow:auto; }
+    .rail-toplinks::-webkit-scrollbar { width:3px; }
+    .rail-toplinks::-webkit-scrollbar-thumb { background: rgba(0,242,255,0.25); border-radius:3px; }
+    .rail-toplinks .item { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; font-family:'JetBrains Mono', monospace; font-size:10px; color:rgba(207,234,255,0.75); background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:8px; }
+    .rail-toplinks .item .pair { color:#fff; }
+    .rail-toplinks .item .vol { color:#00f2ff; }
+    .rail-toplinks .item.warning { border-color:rgba(245,158,11,0.35); }
+    .rail-toplinks .item.warning .pair { color:#f59e0b; }
+    .rail-toplinks .item.threat { border-color:rgba(239,68,68,0.35); background:rgba(239,68,68,0.06); }
+    .rail-toplinks .item.threat .pair { color:#ef4444; }
+    .rail-toplinks .item.behavior { border-color:rgba(192,132,252,0.30); }
+    .rail-toplinks .item.behavior .pair { color:#c084fc; }
+
+    .globe-labels { position:absolute; inset:0; pointer-events:none; z-index:4; }
+    .city-label { position:absolute; font-family:'JetBrains Mono', monospace; font-size:10px; color:#00f2ff; text-shadow:0 0 8px rgba(0,242,255,0.6); pointer-events:none; transform:translate(8px, -50%); white-space:nowrap; letter-spacing:0.04em; opacity:0; transition:opacity 0.4s ease; }
+    .city-label.show { opacity:1; }
+    .city-label::before { content:""; display:inline-block; width:10px; height:1px; background:#00f2ff; box-shadow:0 0 6px #00f2ff; vertical-align:middle; margin-right:6px; }
+
+    .globe-bottom { display:grid; grid-template-columns: auto 1fr auto; align-items:center; gap:20px; padding:6px 10px; }
+    .log-title { font-size:10px; letter-spacing:0.22em; color:rgba(207,234,255,0.55); text-transform:uppercase; white-space:nowrap; }
+    .log-title .lc { color:#00f2ff; margin-right:8px; }
+    .log { display:flex; gap:28px; overflow:hidden; mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%); white-space:nowrap; }
+    .log-strip { display:flex; gap:28px; animation: scrollx 38s linear infinite; }
+    @keyframes scrollx { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+    .log-item { display:inline-flex; align-items:center; gap:8px; font-family:'JetBrains Mono', monospace; font-size:11px; color:rgba(207,234,255,0.7); }
+    .log-item .dot { width:6px; height:6px; border-radius:50%; background:#00f2ff; box-shadow:0 0 8px #00f2ff; }
+    .log-item .dot.warn { background:#f59e0b; box-shadow:0 0 8px #f59e0b; }
+    .log-item .dot.danger { background:#ef4444; box-shadow:0 0 8px #ef4444; }
+    .log-item .dot.behavior { background:#c084fc; box-shadow:0 0 8px #c084fc; }
+    .log-item .city { color:#fff; }
+    .log-item .arrow { color:rgba(207,234,255,0.45); }
+    .log-item .vol { color:#00f2ff; }
+    .log-item.dim { color:rgba(207,234,255,0.35); }
+    .globe-clock { font-family:'JetBrains Mono', monospace; font-size:11px; color:rgba(207,234,255,0.55); letter-spacing:0.06em; white-space:nowrap; }
+
+    @media (max-width: 1100px) {
+        .rail { display:none; }
+        .globe-svg { width: min(72vw, 580px); }
+    }
+    
+    /* === BEACON GLOBE REALTIME STYLES === */
+    .globe-stat .val.live-now { color:#10b981; text-shadow:0 0 10px rgba(16,185,129,0.55); position:relative; }
+    .globe-stat .val.live-now::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981; margin-right:6px; vertical-align:middle; animation: livepulse 1.4s ease-in-out infinite; }
+
+    .last-seen { font-family:'JetBrains Mono', monospace; }
+    .last-seen[data-state="live"] { color:#10b981; text-shadow:0 0 6px rgba(16,185,129,0.45); }
+    .last-seen[data-state="idle"] { color:#f59e0b; }
+    .last-seen[data-state="stale"] { color:rgba(207,234,255,0.45); }
+
+    /* Connection log: live/idle/stale styling */
+    .log-item.live { color:#cfeaff; }
+    .log-item.live .city { color:#10b981; text-shadow:0 0 6px rgba(16,185,129,0.55); }
+    .log-item.idle { color:rgba(207,234,255,0.55); }
+    .log-item.stale { color:rgba(207,234,255,0.30); }
+    .log-item .age { color:rgba(207,234,255,0.40); font-size:10px; margin-left:4px; }
+    .log-item.live .age { color:#10b981; }
+
+    /* Top links: live/idle/stale */
+    .rail-toplinks .item { display:grid; grid-template-columns: 1fr auto auto; gap:8px; align-items:center; }
+    .rail-toplinks .item .age { color:rgba(207,234,255,0.45); font-size:9px; min-width:48px; text-align:right; }
+    .rail-toplinks .item.live { border-color:rgba(16,185,129,0.40); }
+    .rail-toplinks .item.live::before { content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background:#10b981; box-shadow:0 0 6px #10b981; }
+    .rail-toplinks .item.live .age { color:#10b981; }
+    .rail-toplinks .item.idle { opacity:0.85; }
+    .rail-toplinks .item.stale { opacity:0.55; }
+    .rail-toplinks .item { position:relative; overflow:hidden; }
+    /* === END BEACON GLOBE REALTIME STYLES === */
+
+    /* === END BEACON GLOBE STYLES === */
 </style>
 
 </content>

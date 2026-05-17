@@ -193,10 +193,12 @@ function openThreatInspector(el) {
     const highlightedJson = syntaxHighlight(d.meta || '{}');
 
     // 5. 안전한 HTML 생성 (사용자 입력은 이스케이프됨)
+    //    DOMPurify가 인라인 onclick 핸들러를 제거하므로, 버튼은 data-action으로 표식만 두고
+    //    sanitize 이후 addEventListener로 핸들러를 바인딩한다.
     const safeHtml = `
         <div class="card-header border-b" style="justify-content:space-between;">
             <div class="card-title">Threat Intelligence</div>
-            <button onclick="closeInspector()" class="icon-btn" style="background:transparent;"><i data-lucide="x" size="16"></i></button>
+            <button data-action="close" class="icon-btn" style="background:transparent;"><i data-lucide="x" size="16"></i></button>
         </div>
         
         <div class="scroll-body p24" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:20px;">
@@ -236,7 +238,7 @@ function openThreatInspector(el) {
             <div class="inspector-box raw-payload">
                 <div class="section-label mb12" style="display:flex; justify-content:space-between; align-items:center;">
                     <span><i data-lucide="file-json" size="12"></i> Raw Payload Packet</span>
-                    <button class="icon-btn" onclick="copyPayload()" title="복사" style="width:24px;height:24px;padding:0;"><i data-lucide="copy" size="12"></i></button>
+                    <button data-action="copy" class="icon-btn" title="복사" style="width:24px;height:24px;padding:0;"><i data-lucide="copy" size="12"></i></button>
                 </div>
                 <pre class="json-viewer" id="jsonPayload">${highlightedJson}</pre>
             </div>
@@ -244,16 +246,30 @@ function openThreatInspector(el) {
         
         <div class="inspector-footer">
             <div style="display:flex; gap:10px; width:100%;">
-                <button class="btn-danger" style="flex:2; font-weight:700;" onclick="blockIp(${escapeHtml(d.id)}, '${escapeHtml(d.srcIp)}')"><i data-lucide="shield-off" size="14"></i> Source IP 차단</button>
-                <button class="btn-glass" style="flex:1;" onclick="alert('화이트리스트에 등록되었습니다. (Mock)')"><i data-lucide="check-circle" size="14"></i> 오탐 예외</button>
+                <button data-action="block" class="btn-danger" style="flex:2; font-weight:700;"><i data-lucide="shield-off" size="14"></i> Source IP 차단</button>
+                <button data-action="whitelist" class="btn-glass" style="flex:1;"><i data-lucide="check-circle" size="14"></i> 오탐 예외</button>
             </div>
-            <button class="btn-glass w100" style="margin-top:10px;" onclick="isolateAgent('${escapeHtml(d.agent)}')">⚠️ 침해 에이전트 망 분리</button>
+            <button data-action="isolate" class="btn-glass w100" style="margin-top:10px;">⚠️ 침해 에이전트 망 분리</button>
         </div>
     `;
     
     // 6. DOMPurify로 HTML 정제 (추가 보안)
     inspector.innerHTML = DOMPurify.sanitize(safeHtml);
-    
+
+    // 7. sanitize 이후 핸들러 바인딩 (인라인 onclick은 DOMPurify가 제거하므로 필수)
+    const dbId = d.id;
+    const srcIp = d.srcIp || '';
+    const agent = d.agent || '';
+    const bind = (selector, handler) => {
+        const el = inspector.querySelector(selector);
+        if (el) el.addEventListener('click', handler);
+    };
+    bind('[data-action="close"]', closeInspector);
+    bind('[data-action="copy"]', copyPayload);
+    bind('[data-action="block"]', () => blockIp(dbId, srcIp));
+    bind('[data-action="whitelist"]', () => alert('화이트리스트에 등록되었습니다. (Mock)'));
+    bind('[data-action="isolate"]', () => isolateAgent(agent));
+
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 

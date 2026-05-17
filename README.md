@@ -15,6 +15,7 @@ Raspberry Pi 허브 + Spring Boot + Suricata + Python ML로 구성된 통합 보
 - JWT 인증 기반 API 보호 및 대시보드 접근 제어
 - 에이전트 등록/하트비트/오프라인 상태 관리
 - Python ML 서비스 연동(단건/배치 이상 탐지, 모델 상태 확인)
+- 로컬 Ollama 기반 AI 분석/채팅(무료 모델 선택, 다운로드 진행률/로그 표시)
 - Thymeleaf 기반 운영 대시보드(`/dashboard`, `/threats`, `/network` 등)
 
 ## 기술 스택
@@ -127,22 +128,38 @@ powershell -ExecutionPolicy Bypass -File .\start-ai-server.ps1
 
 `start-ai-server.ps1`는 Docker를 사용하지 않고 로컬 Ollama 자동 설치/실행 모드로 동작하며, 모델 다운로드 위치를 프로젝트 내부 `.runtime/ollama`로 고정한 뒤 서버를 실행합니다.
 
-### 4) ML 서비스 실행
+### 4) Python ML 서비스 실행
 
 ```bash
 cd python-ml
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python app.py
 ```
 
 기본 주소: `http://localhost:5000`
 
-### 5) 상태 확인
+### 5) AI(Ollama) 모델 준비
+
+- 접속 경로: `/reports`
+- AI 패널에서 모델을 선택하고 **`선택 모델 다운로드`** 버튼으로 다운로드/적용
+- 다운로드 중에는 진행률(%)과 로그가 실시간 표시됩니다.
+- `/api/ai/bootstrap`는 관리자 권한(`ROLE_ADMIN`)이 필요합니다.
+
+기본 카탈로그(무료 로컬 모델):
+
+- `llama3.2:3b`
+- `qwen2.5:3b`
+- `phi3:mini`
+- `mistral:7b-instruct`
+- `gemma2:2b`
+
+### 6) 상태 확인
 
 - 백엔드 헬스: `GET /actuator/health`
 - ML 헬스: `GET http://localhost:5000/health`
+- AI 상태: `GET /api/ai/status`
 
 ## 주요 API 경로
 
@@ -168,6 +185,7 @@ python app.py
 머신러닝/리포트/시스템:
 
 - `/api/ml`
+- `/api/ai` (`status`, `catalog`, `bootstrap`, `summary`, `chat`, `traffic-analysis`)
 - `/api/reports`
 - `/api/system/stats`
 
@@ -207,6 +225,8 @@ python app.py
 - `Access denied for user`: `.env`의 DB 계정/비밀번호 확인
 - `Connection refused localhost:5000`: ML 서비스 실행 여부 확인
 - `JWT secret` 관련 기동 실패: `BEACON_JWT_SECRET` 길이(32바이트 이상) 확인
+- AI 모델 다운로드가 시작되지 않음: `/api/ai/bootstrap` 권한(관리자) 및 `OLLAMA_AUTO_INSTALL/ALLOW_AUTO_INSTALL` 값 확인
+- AI 모델 전환 후 반영이 늦음: `/api/ai/status`의 `inProgress`, `downloadPercent`, `message` 확인
 - 외부 접속 불가: 방화벽/포트(`8080`, `514/udp`) 및 SSL 설정 확인
 
 ## 라이선스

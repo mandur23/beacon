@@ -117,6 +117,22 @@ public class BeaconApplication {
         if (prepared) {
             System.setProperty(HTTPS_PREPARED_FLAG, "true");
         }
+
+        if (Files.exists(keystorePath)) {
+            // processResources는 main() 이전에 끝나므로 런타임에 만든 keystore는 classpath에 없다.
+            System.setProperty("server.ssl.key-store", keystorePath.toAbsolutePath().toUri().toString());
+            try {
+                syncKeystoreToBuildOutput(keystorePath);
+            } catch (IOException e) {
+                System.err.println("[HTTPS] build 출력으로 keystore 복사 실패(무시 가능): " + e.getMessage());
+            }
+        }
+    }
+
+    private static void syncKeystoreToBuildOutput(Path keystorePath) throws IOException {
+        Path buildKeystore = Paths.get("build", "resources", "main", "keystore.p12");
+        Files.createDirectories(buildKeystore.getParent());
+        Files.copy(keystorePath, buildKeystore, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static String readConfigValue(String key) {

@@ -21,6 +21,7 @@ import java.util.Locale;
 @EnableConfigurationProperties(BeaconFirewallProperties.class)
 public class BeaconApplication {
     private static final String HTTPS_PREPARED_FLAG = "beacon.https.prepared";
+    private static final String DEFAULT_LOCAL_KEYSTORE = "classpath:keystore.p12";
 
     public static void main(String[] args) {
         loadDotenvIntoSystemProperties();
@@ -66,6 +67,10 @@ public class BeaconApplication {
 
         String sslEnabled = readConfigValue("SERVER_SSL_ENABLED");
         if (!"true".equalsIgnoreCase(sslEnabled)) {
+            return;
+        }
+
+        if (!shouldPrepareLocalKeystore()) {
             return;
         }
 
@@ -118,7 +123,7 @@ public class BeaconApplication {
             System.setProperty(HTTPS_PREPARED_FLAG, "true");
         }
 
-        if (Files.exists(keystorePath)) {
+        if (Files.exists(keystorePath) && shouldUseDefaultLocalKeystore()) {
             // processResources는 main() 이전에 끝나므로 런타임에 만든 keystore는 classpath에 없다.
             System.setProperty("server.ssl.key-store", keystorePath.toAbsolutePath().toUri().toString());
             try {
@@ -152,6 +157,24 @@ public class BeaconApplication {
             return;
         }
         System.setProperty(key, defaultValue);
+    }
+
+    private static boolean shouldPrepareLocalKeystore() {
+        // 운영에서 PEM 인증서가 지정되면 로컬 개발용 keystore 자동 생성을 건너뛴다.
+        if (!readConfigValue("SERVER_SSL_CERTIFICATE").isBlank()
+                || !readConfigValue("SERVER_SSL_CERTIFICATE_PRIVATE_KEY").isBlank()) {
+            return false;
+        }
+        // 운영에서 외부 PKCS12 경로를 지정하면 로컬 keystore 자동 생성을 건너뛴다.
+        return shouldUseDefaultLocalKeystore();
+    }
+
+    private static boolean shouldUseDefaultLocalKeystore() {
+        String configuredKeystore = readConfigValue("SERVER_SSL_KEYSTORE_PATH");
+        if (configuredKeystore.isBlank()) {
+            return true;
+        }
+        return DEFAULT_LOCAL_KEYSTORE.equalsIgnoreCase(configuredKeystore);
     }
 
     private static String resolveMkcertCommand() {

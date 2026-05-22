@@ -70,7 +70,8 @@ Copy-Item .env.example .env
 - `ML_SERVICE_URL` (기본 `http://localhost:5000`)
 - `SYSLOG_PORT` (기본 `514`)
 - `SERVER_SSL_ENABLED` (기본 `true`, HTTPS 사용)
-- `SERVER_SSL_KEYSTORE_PASSWORD`, `SERVER_SSL_KEY_ALIAS`
+- `SERVER_SSL_KEYSTORE_PATH`, `SERVER_SSL_KEYSTORE_PASSWORD`, `SERVER_SSL_KEY_ALIAS`
+- `SERVER_SSL_CERTIFICATE`, `SERVER_SSL_CERTIFICATE_PRIVATE_KEY` (PEM 사용 시)
 
 HTTPS 기본 기동을 위해 `src/main/resources/keystore.p12`가 필요합니다.
 
@@ -119,6 +120,19 @@ powershell -ExecutionPolicy Bypass -File .\start-dev.ps1
 ```
 
 `start-dev.ps1`는 `mkcert -install`(최초 1회 신뢰 루트 등록), `keystore.p12` 생성, `.env`의 SSL 값 동기화 후 서버를 실행합니다.
+
+운영에서 공인 인증서 사용:
+
+- PKCS12 파일이 있으면 `SERVER_SSL_KEYSTORE_PATH`를 해당 파일 경로로 지정
+- Let's Encrypt PEM을 쓰면 아래처럼 지정
+
+```bash
+SERVER_SSL_ENABLED=true
+SERVER_SSL_CERTIFICATE=/etc/letsencrypt/live/example.com/fullchain.pem
+SERVER_SSL_CERTIFICATE_PRIVATE_KEY=/etc/letsencrypt/live/example.com/privkey.pem
+```
+
+참고: `SERVER_SSL_CERTIFICATE`/`SERVER_SSL_CERTIFICATE_PRIVATE_KEY` 또는 외부 `SERVER_SSL_KEYSTORE_PATH`가 지정되면, 개발용 `mkcert` 자동 생성은 건너뜁니다.
 
 Windows AI 서버 내부 실행(권장):
 

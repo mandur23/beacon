@@ -2,6 +2,7 @@ package com.example.beacon.controller;
 
 import com.example.beacon.dto.TrafficLogRequest;
 import com.example.beacon.entity.TrafficLog;
+import com.example.beacon.service.AgentService;
 import com.example.beacon.service.TrafficAnalysisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class TrafficController {
     
     private final TrafficAnalysisService trafficAnalysisService;
+    private final AgentService agentService;
     
     @GetMapping
     public ResponseEntity<Page<TrafficLog>> getTrafficLogs(
@@ -86,7 +88,11 @@ public class TrafficController {
     }
     
     @PostMapping
-    public ResponseEntity<TrafficLog> logTraffic(@RequestBody TrafficLogRequest request) {
+    public ResponseEntity<?> logTraffic(@RequestBody TrafficLogRequest request) {
+        if (request.getAgentName() != null && agentService.isIsolated(request.getAgentName())) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("success", false, "message", "AGENT_ISOLATED", "isolated", true));
+        }
         TrafficLog trafficLog = TrafficLog.builder()
                 .sourceIp(request.getSourceIp())
                 .destinationIp(request.getDestinationIp())

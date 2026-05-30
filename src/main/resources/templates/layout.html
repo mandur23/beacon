@@ -107,6 +107,11 @@
                 <span id="headerTime" class="accent"></span>
             </div>
             <div style="width:1px; height:20px; background:var(--glass-border);"></div>
+            <button id="alertBellBtn" onclick="toggleAlertPanel()" style="position:relative; background:none; border:none; cursor:pointer; color:var(--dim); padding:4px;">
+                <i data-lucide="bell" size="18"></i>
+                <span id="alertBadge" style="display:none; position:absolute; top:-2px; right:-2px; background:var(--danger); color:#fff; border-radius:50%; width:16px; height:16px; font-size:9px; font-weight:800; line-height:16px; text-align:center;">0</span>
+            </button>
+            <div style="width:1px; height:20px; background:var(--glass-border);"></div>
             <div class="operator-box">
                 <div class="operator-avatar">AD</div>
                 <div class="operator-meta">
@@ -136,7 +141,121 @@
         const sb = document.getElementById('sidebar');
         if (sb) sb.classList.toggle('collapsed');
     };
+
+    /* ── SSE 실시간 위협 알림 ───────────────────────────────────── */
+    (function initSseAlerts() {
+        let alertCount = 0;
+        const alertLog = [];
+        const badge = document.getElementById('alertBadge');
+
+        const panel = document.createElement('div');
+        panel.id = 'alertPanel';
+        panel.style.cssText = `
+            display:none; position:fixed; top:60px; right:16px; z-index:9000;
+            width:320px; max-height:420px; overflow-y:auto;
+            background:#0d1117; border:1px solid #00f2ff33; border-radius:10px;
+            box-shadow:0 8px 32px rgba(0,0,0,.7); padding:12px;`;
+        panel.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <span style="font-size:12px;font-weight:700;color:#00f2ff;font-family:var(--font-mono);">실시간 위협 알림</span>
+                <button onclick="clearAlerts()" style="background:none;border:none;color:var(--dim);font-size:11px;cursor:pointer;">모두 지우기</button>
+            </div>
+            <div id="alertList"><p style="color:var(--dim);font-size:11px;text-align:center;padding:16px 0;">새로운 위협 없음</p></div>`;
+        document.body.appendChild(panel);
+
+        window.toggleAlertPanel = () => {
+            const p = document.getElementById('alertPanel');
+            p.style.display = p.style.display === 'none' ? 'block' : 'none';
+            if (p.style.display === 'block') {
+                alertCount = 0;
+                if (badge) { badge.style.display = 'none'; badge.textContent = '0'; }
+            }
+        };
+
+        window.clearAlerts = () => {
+            alertLog.length = 0;
+            const list = document.getElementById('alertList');
+            if (list) list.innerHTML = '<p style="color:var(--dim);font-size:11px;text-align:center;padding:16px 0;">새로운 위협 없음</p>';
+            alertCount = 0;
+            if (badge) badge.style.display = 'none';
+        };
+
+        function addAlertItem(data) {
+            alertLog.unshift(data);
+            if (alertLog.length > 50) alertLog.pop();
+
+            const list = document.getElementById('alertList');
+            if (!list) return;
+            const color = data.severity === 'CRITICAL' ? '#ff3c00' : '#f59e0b';
+            const item = document.createElement('div');
+            item.style.cssText = `padding:8px 10px;border-radius:6px;margin-bottom:6px;border-left:3px solid ${color};background:rgba(255,255,255,.03);cursor:pointer;`;
+            item.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                    <span style="font-size:11px;font-weight:700;color:${color};">${data.severity}</span>
+                    <span style="font-size:10px;color:var(--dim);">${new Date(data.ts).toLocaleTimeString()}</span>
+                </div>
+                <div style="font-size:11px;color:#e0e0e0;margin-top:3px;word-break:break-all;">${data.message}</div>`;
+            item.onclick = () => { window.location.href = '/threats'; };
+
+            if (list.querySelector('p')) list.innerHTML = '';
+            list.prepend(item);
+        }
+
+        function connectSse() {
+            const es = new EventSource('/api/alerts/stream');
+            es.addEventListener('alert', e => {
+                try {
+                    const data = JSON.parse(e.data);
+                    addAlertItem(data);
+                    alertCount++;
+                    if (badge) { badge.style.display = 'block'; badge.textContent = alertCount > 99 ? '99+' : alertCount; }
+                    showToast(`[${data.severity}] ${data.message}`, data.severity === 'CRITICAL' ? 'danger' : 'warning', 5000);
+                } catch (_) {}
+            });
+            es.onerror = () => { es.close(); setTimeout(connectSse, 10000); };
+        }
+        connectSse();
+    })();
+
+    /* ── 전역 Toast / Confirm ────────────────────────────────────── */
+    window.showToast = function(message, type = 'info', duration = 3500) {
+        const colors = { success: '#00f2ff', danger: '#ff3c00', warning: '#f59e0b', info: '#a78bfa' };
+        const icons  = { success: 'check-circle', danger: 'alert-octagon', warning: 'alert-triangle', info: 'info' };
+        const toast  = document.createElement('div');
+        toast.style.cssText = `
+            position:fixed; bottom:24px; right:24px; z-index:9999;
+            background:#0d1117; border:1px solid ${colors[type] || colors.info};
+            color:#e0e0e0; padding:12px 18px; border-radius:8px;
+            display:flex; align-items:center; gap:10px; font-size:13px;
+            box-shadow:0 4px 24px rgba(0,0,0,.6); animation:toastIn .2s ease;
+            max-width:360px; word-break:break-word;`;
+        toast.innerHTML = `<i data-lucide="${icons[type] || 'info'}" style="width:16px;height:16px;color:${colors[type]};flex-shrink:0;"></i><span>${DOMPurify ? DOMPurify.sanitize(message) : message}</span>`;
+        document.body.appendChild(toast);
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [toast] });
+        setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .3s'; setTimeout(() => toast.remove(), 300); }, duration);
+    };
+
+    window.showConfirm = function(message) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div style="background:#0d1117;border:1px solid #00f2ff33;border-radius:12px;padding:28px 32px;max-width:400px;width:90%;color:#e0e0e0;">
+                    <p style="margin:0 0 20px;font-size:14px;line-height:1.6;">${DOMPurify ? DOMPurify.sanitize(message) : message}</p>
+                    <div style="display:flex;gap:10px;justify-content:flex-end;">
+                        <button id="confirmNo"  style="padding:8px 18px;border-radius:6px;border:1px solid #333;background:transparent;color:#aaa;cursor:pointer;font-size:13px;">취소</button>
+                        <button id="confirmYes" style="padding:8px 18px;border-radius:6px;border:none;background:#ff3c00;color:#fff;cursor:pointer;font-weight:700;font-size:13px;">확인</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.querySelector('#confirmYes').onclick = () => { overlay.remove(); resolve(true); };
+            overlay.querySelector('#confirmNo').onclick  = () => { overlay.remove(); resolve(false); };
+        });
+    };
 </script>
+<style>
+    @keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+</style>
 <script th:src="@{/js/main.js}"></script>
 </body>
 </html>

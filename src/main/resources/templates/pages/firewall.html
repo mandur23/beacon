@@ -225,7 +225,6 @@
         const searchTxt = document.getElementById('ruleSearch').value.toLowerCase();
         const btns = document.querySelectorAll('.seg-btn');
         
-        // Update button states
         btns.forEach(b => b.classList.toggle('active', b.dataset.action === currentActionFilter));
         
         rows.forEach(r => {
@@ -241,8 +240,18 @@
         });
     }
 
-    function toggleRule(id) {
-        fetch('/api/firewall/toggle/' + id, { method: 'POST' }).then(() => location.reload());
+    async function toggleRule(id) {
+        try {
+            const resp = await fetch('/api/firewall/toggle/' + id, { method: 'POST' });
+            if (resp.ok) {
+                showToast('방화벽 정책 활성 상태가 변경되었습니다.', 'success');
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                showToast('상태 토글 중 오류가 발생했습니다.', 'danger');
+            }
+        } catch(e) {
+            showToast('네트워크 오류가 발생했습니다.', 'danger');
+        }
     }
 
     function openAddRuleModal() {
@@ -255,26 +264,56 @@
         document.getElementById('addRuleModal').classList.remove('active');
     }
 
-    function deleteRule(id, name) {
-        if (confirm(`다음 규칙을 영구 삭제하시겠습니까?\n[${name}]`)) {
-            fetch('/api/firewall/' + id, { method: 'DELETE' }).then(() => location.reload());
+    async function deleteRule(id, name) {
+        const confirmed = await showConfirm(`정말로 방화벽 규칙 [${name}]을 영구 삭제하시겠습니까?\n이 조치는 되돌릴 수 없습니다.`);
+        if (!confirmed) return;
+
+        try {
+            const resp = await fetch('/api/firewall/' + id, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('규칙이 성공적으로 제거되었습니다.', 'success');
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                showToast(data.message || '규칙 삭제 처리에 실패했습니다.', 'danger');
+            }
+        } catch (e) {
+            showToast('서버 통신 장애가 발생했습니다.', 'danger');
         }
     }
 
-    function submitAddRule() {
+    async function submitAddRule() {
         const payload = {
-            name: document.getElementById('addName').value,
+            name: document.getElementById('addName').value.trim(),
             action: document.getElementById('addAction').value,
-            sourceAddress: document.getElementById('addSrc').value,
-            destinationAddress: document.getElementById('addDst').value,
-            port: document.getElementById('addPort').value,
-            priority: parseInt(document.getElementById('addPriority').value)
+            sourceAddress: document.getElementById('addSrc').value.trim() || 'any',
+            destinationAddress: document.getElementById('addDst').value.trim() || 'any',
+            port: document.getElementById('addPort').value.trim() || 'any',
+            priority: parseInt(document.getElementById('addPriority').value) || 100
         };
-        fetch('/api/firewall', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        }).then(() => location.reload());
+
+        if (!payload.name) {
+            showToast('규칙 이름을 입력해 주십시오.', 'warning');
+            return;
+        }
+
+        try {
+            const resp = await fetch('/api/firewall', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                showToast('신규 방화벽 보안 규칙이 등재되었습니다.', 'success');
+                closeAddRuleModal();
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                showToast(data.message || '규칙 등록에 실패했습니다.', 'danger');
+            }
+        } catch(e) {
+            showToast('서버 API 통신 장애가 발생했습니다.', 'danger');
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -392,6 +431,61 @@
         position: relative;
         display: inline-flex;
         align-items: center;
+    }
+
+    .cyber-toast {
+        background: rgba(10, 10, 15, 0.95);
+        border-left: 4px solid var(--accent);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease-out;
+        text-align: left;
+        z-index: 100000;
+    }
+    .cyber-toast.success { border-left-color: #06d6a0; }
+    .cyber-toast.danger { border-left-color: #ff3d5a; }
+    .cyber-toast.warning { border-left-color: #ffd166; }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .btn-glass-sm {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--dim);
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: 0.2s;
+    }
+    .btn-glass-sm:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+    }
+    .btn-danger-sm {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        color: var(--danger);
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-danger-sm:hover {
+        background: var(--danger);
+        color: #fff;
+        box-shadow: 0 0 15px var(--danger);
     }
 </style>
 

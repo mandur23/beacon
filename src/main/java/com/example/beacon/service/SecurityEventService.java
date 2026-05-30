@@ -30,6 +30,7 @@ public class SecurityEventService {
     private final FirewallService firewallService;
     private final FirewallHitsBatchService firewallHitsBatchService;
     private final EventBlockingPolicyService eventBlockingPolicyService;
+    private final SseAlertService sseAlertService;
 
     @Transactional
     public SecurityEvent createEvent(SecurityEvent event) {
@@ -76,7 +77,24 @@ public class SecurityEventService {
             firewallService.createBlockRuleForIp(event.getSourceIp(), reason, "system-policy");
         }
 
-        return createEvent(event);
+        SecurityEvent saved = createEvent(event);
+
+        // HIGH/CRITICAL 위협은 SSE로 실시간 알림 발송
+        String sev = saved.getSeverity();
+        if ("HIGH".equalsIgnoreCase(sev) || "CRITICAL".equalsIgnoreCase(sev)) {
+            try {
+                sseAlertService.broadcast(
+                        saved.getEventType(),
+                        sev,
+                        "[" + saved.getAgentName() + "] " + saved.getEventType()
+                                + " — " + saved.getSourceIp(),
+                        saved.getId()
+                );
+            } catch (Exception e) {
+                log.warn("SSE broadcast failed: {}", e.getMessage());
+            }
+        }
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -167,6 +185,16 @@ public class SecurityEventService {
         SecurityEvent event = securityEventRepository.findById(eventId)
                 .orElseThrow(() -> new ResourceNotFoundException("SecurityEvent", eventId));
         event.setStatus("조사중");
+        event.setHandledBy(handledBy);
+        return securityEventRepository.save(event);
+    }
+
+    @Transactional
+    public SecurityEvent whitelistEvent(Long eventId, String handledBy) {
+        SecurityEvent event = securityEventRepository.findById(eventId)
+                .orElseThrow(() -> new ResourceNotFoundException("SecurityEvent", eventId));
+        event.setStatus("예외처리");
+        event.setResolvedAt(LocalDateTime.now());
         event.setHandledBy(handledBy);
         return securityEventRepository.save(event);
     }

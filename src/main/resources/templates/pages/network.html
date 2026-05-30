@@ -210,6 +210,7 @@
             <div class="card-header">
                 <div class="card-title glow-text">Traffic Intelligence Stream (Live)</div>
                 <div class="header-actions" style="display:flex; gap:12px; align-items:center;">
+                    <input type="text" id="processSearchFilter" class="glass-select" style="width: 140px; padding: 4px 10px;" placeholder="프로세스 필터..." oninput="onProcessSearchInput()" />
                     <select id="agentFilter" class="glass-select" onchange="fetchTrafficLogs()">
                         <option value="">모든 에이전트</option>
                     </select>
@@ -333,9 +334,6 @@
 
     </div>
 </th:block>
-                        </tr>
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>
@@ -347,6 +345,10 @@
 <script th:inline="javascript">
 /*<![CDATA[*/
 document.addEventListener('DOMContentLoaded', () => {
+    // URL 파라미터 파싱 (agentName 자동 필터)
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetAgent = urlParams.get('agentName');
+
     // 1. Vis.js 기반 다이나믹 토폴로지 렌더링
     const visContainer = document.getElementById('visNetworkContainer');
     const nodesData = /*[[${nodes}]]*/ [];
@@ -398,7 +400,14 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             interaction: { hover: true, tooltipDelay: 200 }
         };
-        new vis.Network(visContainer, data, options);
+        const networkObj = new vis.Network(visContainer, data, options);
+
+        // vis.js 노드 선택 이벤트 바인딩
+        networkObj.on("selectNode", function (params) {
+            if (params.nodes.length > 0) {
+                focusNode(params.nodes[0]);
+            }
+        });
     }
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -460,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!resp.ok) return;
             const agents = await resp.json();
             
-            const currentVal = filter.value;
+            const currentVal = filter.value || targetAgent || '';
             filter.innerHTML = '<option value="">모든 에이전트</option>';
             agents.forEach(a => {
                 const opt = document.createElement('option');
@@ -469,18 +478,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (a.agentName === currentVal) opt.selected = true;
                 filter.appendChild(opt);
             });
+
+            if (targetAgent && filter.value === targetAgent) {
+                window.history.replaceState({}, document.title, "/network?tab=traffic");
+            }
         } catch (e) {}
     }
+
+    window.onProcessSearchInput = () => {
+        renderTrafficTable(currentLogs);
+    };
+
+    window.filterTrafficByProcess = function(processName) {
+        const input = document.getElementById('processSearchFilter');
+        if (input) {
+            input.value = processName;
+            onProcessSearchInput();
+        }
+    };
 
     function renderTrafficTable(logs) {
         const tbody = document.getElementById('trafficTableBody');
         if (!tbody) return;
         
-        const countEl = document.getElementById('trafficCount');
-        if (countEl) countEl.textContent = `${logs.length} LOGS`;
+        const processSearch = document.getElementById('processSearchFilter')?.value.toLowerCase().trim() || '';
         
-        tbody.innerHTML = logs.map((l, i) => {
+        let filteredLogs = logs;
+        if (processSearch) {
+            filteredLogs = logs.filter(l => {
+                let procName = '';
+                if (l.rawData) {
+                    try { procName = JSON.parse(l.rawData).process_name || ''; } catch(e) {}
+                }
+                return procName.toLowerCase().includes(processSearch);
+            });
+        }
+        
+        const countEl = document.getElementById('trafficCount');
+        if (countEl) countEl.textContent = `${filteredLogs.length} LOGS`;
+        
+        tbody.innerHTML = filteredLogs.map((l) => {
             try {
+                const originalIndex = logs.indexOf(l);
                 const time = new Date(l.timestamp).toLocaleTimeString();
                 const isAnomaly = l.isAnomaly === true;
                 
@@ -490,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let directionColor = (SERVICE_MAP[l.sourcePort]) ? 'var(--success)' : 'var(--info)';
 
                 return `
-                    <tr onclick="showTrafficDetails(${i})" class="${isAnomaly ? 'anomaly-row' : ''}">
+                    <tr onclick="showTrafficDetails(${originalIndex})" class="${isAnomaly ? 'anomaly-row' : ''}" style="cursor:pointer;">
                         <td class="dim" style="font-size:11px;">${time}</td>
                         <td class="mono">
                             <div style="font-weight:800; color:var(--accent);">${l.agentName || 'Unknown'}</div>
@@ -549,14 +588,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // [작업 4] 원격 프로세스 종료 버튼 연동
     window.killTargetProcess = async (pid, processName) => {
         const agentName = document.getElementById('agentFilter')?.value;
-        if (!agentName) { alert("에이전트를 먼저 선택해야 명령을 보낼 수 있습니다."); return; }
+        if (!agentName) { showToast && showToast("에이전트를 먼저 선택해야 명령을 보낼 수 있습니다.", 'warning'); return; }
         if (!confirm(`정말로 [${processName} (PID: ${pid})]를 강제 종료하시겠습니까?`)) return;
 
         try {
             const resp = await fetch(`/api/traffic/kill-process?agentName=${encodeURIComponent(agentName)}&pid=${pid}&processName=${encodeURIComponent(processName)}`, { method: 'POST' });
             const res = await resp.json();
-            alert(res.message);
-        } catch(e) { alert("명령 전달 실패: " + e.message); }
+            showToast && showToast(res.message, res.success ? 'success' : 'danger');
+        } catch(e) { showToast && showToast("명령 전달 실패: " + e.message, 'danger'); }
     };
 
     window.showTrafficDetails = async (idx) => {

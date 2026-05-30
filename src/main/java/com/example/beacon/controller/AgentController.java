@@ -47,6 +47,10 @@ public class AgentController {
 
     @PostMapping("/heartbeat")
     public ResponseEntity<Map<String, Object>> heartbeat(@Valid @RequestBody AgentHeartbeatRequest request) {
+        if (agentService.isIsolated(request.getAgentName())) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("success", false, "message", "AGENT_ISOLATED", "isolated", true));
+        }
         agentService.updateHeartbeat(request.getAgentName(), request.getMetadata());
         return ResponseEntity.ok(Map.of("success", true, "message", "Heartbeat received"));
     }
@@ -77,6 +81,15 @@ public class AgentController {
         ));
     }
     
+    @PostMapping("/isolate/{agentName}")
+    public ResponseEntity<Map<String, Object>> isolateAgent(@PathVariable String agentName) {
+        agentService.isolateAgent(agentName);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "에이전트 [" + agentName + "]가 격리되었습니다"
+        ));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteAgent(@PathVariable Long id) {
         agentService.deleteAgent(id);

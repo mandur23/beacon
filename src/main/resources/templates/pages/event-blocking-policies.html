@@ -201,7 +201,7 @@ function openAddModal() {
 }
 function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
 
-function submitAdd() {
+async function submitAdd() {
     const body = {
         name: document.getElementById('addName').value.trim(),
         eventTypePattern: document.getElementById('addPattern').value.trim() || '*',
@@ -211,18 +211,23 @@ function submitAdd() {
         priority: parseInt(document.getElementById('addPriority').value, 10) || 0,
         enabled: document.getElementById('addEnabled').value === 'true'
     };
-    if (!body.name) { showToast('이름을 입력하세요', 'error'); return; }
-    fetch('/api/event-blocking-policies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.message, data.success ? 'success' : 'error');
-        if (data.success) { closeAddModal(); location.reload(); }
-    })
-    .catch(() => showToast('오류가 발생했습니다', 'error'));
+    if (!body.name) { showToast('이름을 입력하세요', 'warning'); return; }
+    
+    try {
+        const r = await fetch('/api/event-blocking-policies', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await r.json();
+        showToast(data.message, data.success ? 'success' : 'danger');
+        if (data.success) { 
+            closeAddModal(); 
+            setTimeout(() => location.reload(), 1200);
+        }
+    } catch(e) {
+        showToast('오류가 발생했습니다', 'danger');
+    }
 }
 
 function openEditModal(row) {
@@ -240,7 +245,7 @@ function openEditModal(row) {
 }
 function closeEditModal() { document.getElementById('editModal').style.display = 'none'; }
 
-function submitEdit() {
+async function submitEdit() {
     const id = document.getElementById('editId').value;
     const body = {
         name: document.getElementById('editName').value.trim(),
@@ -251,31 +256,41 @@ function submitEdit() {
         priority: parseInt(document.getElementById('editPriority').value, 10) || 0,
         enabled: document.getElementById('editEnabled').value === 'true'
     };
-    if (!body.name) { showToast('이름을 입력하세요', 'error'); return; }
-    fetch('/api/event-blocking-policies/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.message, data.success ? 'success' : 'error');
-        if (data.success) { closeEditModal(); location.reload(); }
-    })
-    .catch(() => showToast('오류가 발생했습니다', 'error'));
+    if (!body.name) { showToast('이름을 입력하세요', 'warning'); return; }
+    
+    try {
+        const r = await fetch('/api/event-blocking-policies/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await r.json();
+        showToast(data.message, data.success ? 'success' : 'danger');
+        if (data.success) { 
+            closeEditModal(); 
+            setTimeout(() => location.reload(), 1200);
+        }
+    } catch(e) {
+        showToast('오류가 발생했습니다', 'danger');
+    }
 }
 
-function deletePolicy(btn) {
+async function deletePolicy(btn) {
     const id = btn.dataset.id;
     const name = btn.dataset.name;
-    if (!confirm("'" + name + "' 정책을 삭제하시겠습니까?")) return;
-    fetch('/api/event-blocking-policies/' + id, { method: 'DELETE' })
-        .then(r => r.json())
-        .then(data => {
-            showToast(data.message, data.success ? 'success' : 'error');
-            if (data.success) location.reload();
-        })
-        .catch(() => showToast('오류가 발생했습니다', 'error'));
+    const confirmed = await showConfirm(`정말로 정책 [${name}]을 삭제하시겠습니까?\n이 조치는 되돌릴 수 없습니다.`);
+    if (!confirmed) return;
+
+    try {
+        const r = await fetch('/api/event-blocking-policies/' + id, { method: 'DELETE' });
+        const data = await r.json();
+        showToast(data.message, data.success ? 'success' : 'danger');
+        if (data.success) {
+            setTimeout(() => location.reload(), 1200);
+        }
+    } catch(e) {
+        showToast('오류가 발생했습니다', 'danger');
+    }
 }
 
 document.addEventListener('keydown', e => {
@@ -284,7 +299,58 @@ document.addEventListener('keydown', e => {
         closeEditModal();
     }
 });
+
 </script>
+<style>
+    .cyber-toast {
+        background: rgba(10, 10, 15, 0.95);
+        border-left: 4px solid var(--accent);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease-out;
+        text-align: left;
+        z-index: 100000;
+    }
+    .cyber-toast.success { border-left-color: #06d6a0; }
+    .cyber-toast.danger { border-left-color: #ff3d5a; }
+    .cyber-toast.warning { border-left-color: #ffd166; }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .btn-glass-sm {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: var(--dim);
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: 0.2s;
+    }
+    .btn-glass-sm:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+    .btn-danger-sm {
+        background: rgba(239,68,68,0.1);
+        border: 1px solid rgba(239,68,68,0.4);
+        color: var(--danger);
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-danger-sm:hover { background: var(--danger); color: #fff; box-shadow: 0 0 15px var(--danger); }
+</style>
 
 </content>
 </body>

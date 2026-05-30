@@ -145,16 +145,31 @@
             </div>
         </div>
     </div>
-    <div class="inspector-footer">
+    <div class="inspector-footer" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="background:rgba(255, 61, 90, 0.05); border:1px solid rgba(255, 61, 90, 0.2); border-radius:10px; padding:12px; font-size:11px;">
+            <p style="color:var(--danger); font-weight:800; margin-bottom:4px; text-align:left;">에이전트 비상 통제 (Asset Controls)</p>
+            <p style="color:var(--dim); margin-bottom:8px; line-height:1.4; text-align:left;">이 자산이 침해되었거나 비상 상황 시 격리하거나 연결을 끊습니다.</p>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <button class="btn-danger-sm" style="font-size:10px; padding:8px; justify-content:center;" onclick="controlAgentIsolate()">
+                    <i data-lucide="shield-alert" size="12"></i> 호스트 격리
+                </button>
+                <button class="btn-glass-sm" style="font-size:10px; padding:8px; justify-content:center; color:#fff;" onclick="controlAgentDisconnect()">
+                    <i data-lucide="power" size="12"></i> 연결 차단
+                </button>
+            </div>
+        </div>
         <button class="btn-glass" style="width:100%;" onclick="closeInspector()">닫기</button>
     </div>
 </div>
 
 <script>
+let selectedAgentName = '';
+
 function openInspector(dbId) {
     const row = document.querySelector(`.agent-row[data-dbid="${dbId}"]`);
     if (!row) return;
     const d = row.dataset;
+    selectedAgentName = d.name;
     document.getElementById('inspAgentName').textContent = d.name;
     document.getElementById('inspHost').textContent = d.host;
     document.getElementById('inspId').textContent = "AG-" + d.dbid;
@@ -246,6 +261,49 @@ function closeInspector() {
     document.getElementById('agentInspector').classList.remove('active');
     document.getElementById('inspectorBackdrop').classList.remove('active');
 }
+
+async function controlAgentIsolate() {
+    if (!selectedAgentName) return;
+    const confirmed = await showConfirm(`[비상 격리] 정말로 에이전트 [${selectedAgentName}]를 네트워크 격리하시겠습니까?\n이 장비의 모든 외부 접근이 방화벽에서 즉시 영구 차단됩니다.`);
+    if (!confirmed) return;
+
+    try {
+        const resp = await fetch(`/api/agents/isolate/${encodeURIComponent(selectedAgentName)}`, { method: 'POST' });
+        const res = await resp.json();
+        if (res.success) {
+            showToast(res.message || '격리 정책이 적용되었습니다.', 'success');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showToast(res.message || '격리 처리 중 오류가 발생했습니다.', 'danger');
+        }
+    } catch(e) {
+        showToast('서버 통신 실패', 'danger');
+    }
+}
+
+async function controlAgentDisconnect() {
+    if (!selectedAgentName) return;
+    const confirmed = await showConfirm(`정말로 에이전트 [${selectedAgentName}]의 통신 연결을 강제 차단하시겠습니까?\n장비의 상태가 오프라인으로 갱신됩니다.`);
+    if (!confirmed) return;
+
+    try {
+        const resp = await fetch('/api/agents/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentName: selectedAgentName })
+        });
+        const res = await resp.json();
+        if (res.success) {
+            showToast('에이전트 통신 연결이 중단되었습니다.', 'success');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            showToast(res.message || '연결 차단 처리 실패', 'danger');
+        }
+    } catch(e) {
+        showToast('서버 API 요청 중 장애가 발생했습니다.', 'danger');
+    }
+}
+
 </script>
 
 <style>
@@ -356,6 +414,55 @@ function closeInspector() {
         border-top: 1px solid var(--glass-border); 
         background: rgba(0,0,0,.2); 
     }
+
+    .cyber-toast {
+        background: rgba(10, 10, 15, 0.95);
+        border-left: 4px solid var(--accent);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease-out;
+        text-align: left;
+        z-index: 100000;
+    }
+    .cyber-toast.success { border-left-color: #06d6a0; }
+    .cyber-toast.danger { border-left-color: #ff3d5a; }
+    .cyber-toast.warning { border-left-color: #ffd166; }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .btn-glass-sm {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: var(--dim);
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: 0.2s;
+    }
+    .btn-glass-sm:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+    .btn-danger-sm {
+        background: rgba(239,68,68,0.1);
+        border: 1px solid rgba(239,68,68,0.4);
+        color: var(--danger);
+        cursor: pointer;
+        padding: 6px 12px;
+        transition: 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-danger-sm:hover { background: var(--danger); color: #fff; box-shadow: 0 0 15px var(--danger); }
 </style>
 
 </content>

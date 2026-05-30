@@ -20,14 +20,14 @@
 </div>
 
 <!-- Command Bar Filter -->
-<div class="premium-glass command-bar-wrapper mb24">
+<div class="premium-glass command-bar-wrapper mb24" style="display:flex; flex-direction:column; gap:12px;">
     <form th:action="@{/threats}" method="get" id="filterForm" class="command-bar">
         <input type="hidden" name="severity" th:value="${currentSeverity}"/>
         <input type="hidden" name="page" value="0"/>
 
         <div class="cb-search">
             <i data-lucide="search" size="16"></i>
-            <input type="text" name="search" th:value="${search}" placeholder="SPL 쿼리 또는 키워드 입력 (예: IP, 설명)..."/>
+            <input type="text" name="search" id="searchInput" th:value="${search}" placeholder="SPL 쿼리 또는 키워드 입력 (예: IP, 포트, 공격 유형)..."/>
         </div>
         
         <div class="cb-filters">
@@ -61,6 +61,18 @@
             </label>
         </div>
     </form>
+    
+    <!-- 포렌식 프리셋 퀵 필터 -->
+    <div class="preset-filters-bar" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+        <span style="font-size: 11px; color: var(--dim); display: inline-flex; align-items: center; gap: 4px; font-weight: 700; margin-right: 8px;">
+            <i data-lucide="radar" size="12" style="color:var(--accent);"></i> 포렌식 퀵 프리셋:
+        </span>
+        <button type="button" class="btn-quick-cmd" onclick="applyPresetFilter('portscan')">포트 스캔 탐지</button>
+        <button type="button" class="btn-quick-cmd" onclick="applyPresetFilter('brute')">비정상 Brute Force</button>
+        <button type="button" class="btn-quick-cmd" onclick="applyPresetFilter('SURICATA')">Suricata 탐지망</button>
+        <button type="button" class="btn-quick-cmd" onclick="applyPresetFilter('critical')">미결 위급 로그</button>
+        <button type="button" class="btn-quick-cmd" onclick="applyPresetFilter('clear')">초기화</button>
+    </div>
 </div>
 
 <div class="threat-master-layout">
@@ -151,6 +163,40 @@ function clearDate() {
     form.submit();
 }
 
+function applyPresetFilter(presetType) {
+    const form = document.getElementById('filterForm');
+    const searchInput = document.getElementById('searchInput');
+    const sourceSelect = form.querySelector('select[name="source"]');
+    const severityInput = form.querySelector('input[name="severity"]');
+    const riskOnlyCheckbox = form.querySelector('input[name="riskOnly"]');
+
+    if (presetType === 'portscan') {
+        searchInput.value = 'portscan';
+        sourceSelect.value = 'all';
+        riskOnlyCheckbox.checked = false;
+    } else if (presetType === 'brute') {
+        searchInput.value = 'brute';
+        sourceSelect.value = 'all';
+        riskOnlyCheckbox.checked = false;
+    } else if (presetType === 'SURICATA') {
+        searchInput.value = '';
+        sourceSelect.value = 'SURICATA';
+        riskOnlyCheckbox.checked = false;
+    } else if (presetType === 'critical') {
+        searchInput.value = '';
+        sourceSelect.value = 'all';
+        severityInput.value = 'critical';
+        riskOnlyCheckbox.checked = true;
+    } else if (presetType === 'clear') {
+        searchInput.value = '';
+        sourceSelect.value = 'all';
+        severityInput.value = 'all';
+        riskOnlyCheckbox.checked = false;
+        form.querySelector('input[name="date"]').value = '';
+    }
+    form.submit();
+}
+
 function syntaxHighlight(jsonStr) {
     try {
         const obj = JSON.parse(jsonStr);
@@ -182,93 +228,115 @@ function openThreatInspector(el) {
     const d = el.dataset;
     const inspector = document.getElementById('threatInspector');
     
-    // 3. XSS 방지: 사용자 입력 데이터를 안전하게 이스케이프
+    // 3. XSS 방지
     const escapeHtml = (text) => {
         const div = document.createElement('div');
         div.textContent = text || '';
         return div.innerHTML;
     };
     
-    // 4. Raw Json 포매팅 (이미 안전한 데이터)
+    // 4. 상태 배지
+    let statusClass = 'warning';
+    let statusLabel = '미조치';
+    if (d.status === 'blocked' || d.status === 'resolved') {
+        statusClass = 'success'; statusLabel = '차단됨';
+    } else if (d.status === 'investigating') {
+        statusClass = 'warning'; statusLabel = '조사 중';
+    } else if (d.status === 'whitelisted') {
+        statusClass = 'success'; statusLabel = '예외됨';
+    }
+
     const highlightedJson = syntaxHighlight(d.meta || '{}');
 
-    // 5. 안전한 HTML 생성 (사용자 입력은 이스케이프됨)
-    //    DOMPurify가 인라인 onclick 핸들러를 제거하므로, 버튼은 data-action으로 표식만 두고
-    //    sanitize 이후 addEventListener로 핸들러를 바인딩한다.
     const safeHtml = `
-        <div class="card-header border-b" style="justify-content:space-between;">
-            <div class="card-title">Threat Intelligence</div>
-            <button data-action="close" class="icon-btn" style="background:transparent;"><i data-lucide="x" size="16"></i></button>
+        <div class="card-header border-b" style="justify-content:space-between; height: 53px;">
+            <div class="card-title">Threat Forensics Intel</div>
+            <button onclick="closeInspector()" class="icon-btn" style="background:transparent;"><i data-lucide="x" size="16"></i></button>
         </div>
         
-        <div class="scroll-body p24" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:20px;">
+        <div class="scroll-body p24" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:16px; padding: 20px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-end;">
                 <div>
-                    <div style="font-size:11px; color:var(--dim); margin-bottom:4px; font-weight:700;">EVENT CORRELATION ID</div>
-                    <div class="mono glow-text" style="font-size:22px; color:${escapeHtml(d.severityColor)};">${escapeHtml(d.evtId)}</div>
+                    <div style="font-size:10px; color:var(--dim); margin-bottom:4px; font-weight:700; letter-spacing:0.05em;">CORRELATION ID</div>
+                    <div class="mono glow-text" style="font-size:20px; color:${escapeHtml(d.severityColor)};">${escapeHtml(d.evtId)}</div>
                 </div>
-                <span class="badge ${d.status === 'pending' ? 'warning' : 'success'}">${d.status === 'pending' ? '미조치' : '해결됨'}</span>
+                <span class="badge ${statusClass}">${statusLabel}</span>
             </div>
             
-            <div class="inspector-box network-vis">
-                <div class="section-label mb12"><i data-lucide="git-merge" size="12"></i> Attack Path Visualization</div>
+            <div class="inspector-box network-vis" style="padding: 12px;">
+                <div class="section-label mb12"><i data-lucide="git-merge" size="12"></i> Attack Vector Path</div>
                 <div class="vis-topology">
                     <div class="vis-node source-node">
-                        <i data-lucide="${d.source === 'SURICATA'? 'webhook' : 'terminal'}" size="20"></i>
-                        <span class="mono">${escapeHtml(d.srcIp)}</span>
+                        <i data-lucide="${d.source === 'SURICATA'? 'webhook' : 'crosshair'}" size="18"></i>
+                        <span class="mono" style="font-size:11px; margin-top:4px;">${escapeHtml(d.srcIp)}</span>
                         <div class="pulse-ring"></div>
                     </div>
                     <div class="vis-edge">
                         <div class="edge-line"></div>
-                        <span class="edge-label mono">${escapeHtml(d.proto)} : ${escapeHtml(d.port)}</span>
+                        <span class="edge-label mono" style="font-size:9px;">${escapeHtml(d.proto)}:${escapeHtml(d.port)}</span>
                     </div>
                     <div class="vis-node dest-node">
-                        <i data-lucide="server" size="20"></i>
-                        <span class="mono">${escapeHtml(d.dstIp)}</span>
-                        <span>${escapeHtml(d.agent)}</span>
+                        <i data-lucide="server" size="18"></i>
+                        <span class="mono" style="font-size:11px; margin-top:4px;">${escapeHtml(d.dstIp)}</span>
+                        <span style="font-size: 9px; color: var(--dim);">${escapeHtml(d.agent)}</span>
                     </div>
                 </div>
             </div>
 
-            <div class="inspector-box ai-analysis">
-                <div class="section-label mb12"><i data-lucide="sparkles" size="12"></i> Context Analysis</div>
-                <p style="font-size:12px; line-height:1.6; color:#ccc;">${escapeHtml(d.desc) || '해당 이벤트에 대한 AI 시그니처 설명이 존재하지 않습니다.'}</p>
+            <div class="inspector-box ai-analysis" style="padding: 12px;">
+                <div class="section-label mb8"><i data-lucide="info" size="12"></i> Signature Description</div>
+                <p style="font-size:12px; line-height:1.6; color:#ccc; margin:0;">${escapeHtml(d.desc) || '설명이 존재하지 않습니다.'}</p>
             </div>
             
-            <div class="inspector-box raw-payload">
-                <div class="section-label mb12" style="display:flex; justify-content:space-between; align-items:center;">
-                    <span><i data-lucide="file-json" size="12"></i> Raw Payload Packet</span>
-                    <button data-action="copy" class="icon-btn" title="복사" style="width:24px;height:24px;padding:0;"><i data-lucide="copy" size="12"></i></button>
+            <div class="inspector-box ai-analysis" style="padding: 12px; border-color: rgba(255, 209, 102, 0.2);">
+                <div class="section-label mb8" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="color:#ffd166;"><i data-lucide="sparkles" size="12"></i> AI Incident Forensic Analyst</span>
+                    <button class="btn-quick-cmd" id="aiReportBtn" data-action="ai-report" style="padding:2px 6px; font-size:10px; border-color:#ffd166; color:#ffd166;">🪄 보고서 생성</button>
+                </div>
+                <div id="aiForensicContainer" style="font-size:11px; line-height:1.6; color:#ccc; min-height: 40px; display:flex; flex-direction:column; justify-content:center;">
+                    <p style="font-size:11px; color:var(--dim); font-style:italic; margin:0; text-align:center;">[보고서 생성] 클릭 시 AI가 패킷을 역추적하여 대응 대책을 스트리밍 출력합니다.</p>
+                </div>
+            </div>
+            
+            <div class="inspector-box raw-payload" style="padding: 12px;">
+                <div class="section-label mb8" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span><i data-lucide="file-json" size="12"></i> Raw Packet Metadata</span>
+                    <button class="icon-btn" data-action="copy" title="복사" style="width:20px;height:20px;padding:0;"><i data-lucide="copy" size="11"></i></button>
                 </div>
                 <pre class="json-viewer" id="jsonPayload">${highlightedJson}</pre>
             </div>
         </div>
         
-        <div class="inspector-footer">
-            <div style="display:flex; gap:10px; width:100%;">
-                <button data-action="block" class="btn-danger" style="flex:2; font-weight:700;"><i data-lucide="shield-off" size="14"></i> Source IP 차단</button>
-                <button data-action="whitelist" class="btn-glass" style="flex:1;"><i data-lucide="check-circle" size="14"></i> 오탐 예외</button>
+        <div class="inspector-footer" style="padding: 14px 20px; background: rgba(0,0,0,0.3); border-top: 1px solid var(--glass-border);">
+            <div style="display:flex; gap:6px; width:100%; margin-bottom:8px;">
+                <button class="btn-danger" data-action="block" style="flex:1; font-weight:700; font-size:11px; padding: 10px 0; display:flex; align-items:center; justify-content:center; gap:4px;">
+                    <i data-lucide="shield-ban" size="12"></i> IP 차단
+                </button>
+                <button class="btn-warning" data-action="investigate" style="flex:1; font-weight:700; font-size:11px; padding: 10px 0; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.4); color:#f59e0b; cursor:pointer; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:4px;">
+                    <i data-lucide="search" size="12"></i> 조사 개시
+                </button>
+                <button class="btn-glass" data-action="whitelist" style="flex:1; font-size:11px; padding: 10px 0; display:flex; align-items:center; justify-content:center; gap:4px;">
+                    <i data-lucide="check" size="12"></i> 예외 등록
+                </button>
             </div>
-            <button data-action="isolate" class="btn-glass w100" style="margin-top:10px;">⚠️ 침해 에이전트 망 분리</button>
+            <button class="btn-glass w100" data-action="isolate" style="font-size:11px; padding: 10px 0; border-color:var(--danger); color:var(--danger); font-weight:700; display:flex; align-items:center; justify-content:center; gap:4px; margin-top:4px;">
+                <i data-lucide="radio" size="12"></i> ⚠️ 에이전트 망 분리 (Isolate Host)
+            </button>
         </div>
     `;
     
-    // 6. DOMPurify로 HTML 정제 (추가 보안)
     inspector.innerHTML = DOMPurify.sanitize(safeHtml);
 
-    // 7. sanitize 이후 핸들러 바인딩 (인라인 onclick은 DOMPurify가 제거하므로 필수)
-    const dbId = d.id;
-    const srcIp = d.srcIp || '';
-    const agent = d.agent || '';
     const bind = (selector, handler) => {
-        const el = inspector.querySelector(selector);
-        if (el) el.addEventListener('click', handler);
+        const node = inspector.querySelector(selector);
+        if (node) node.addEventListener('click', handler);
     };
-    bind('[data-action="close"]', closeInspector);
     bind('[data-action="copy"]', copyPayload);
-    bind('[data-action="block"]', () => blockIp(dbId, srcIp));
-    bind('[data-action="whitelist"]', () => alert('화이트리스트에 등록되었습니다. (Mock)'));
-    bind('[data-action="isolate"]', () => isolateAgent(agent));
+    bind('[data-action="ai-report"]', () => generateForensicReport(d.id));
+    bind('[data-action="block"]', () => blockIp(d.id, d.srcIp));
+    bind('[data-action="investigate"]', () => investigateThreat(d.id));
+    bind('[data-action="whitelist"]', () => whitelistIp(d.id));
+    bind('[data-action="isolate"]', () => isolateAgent(d.agent));
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
@@ -280,31 +348,154 @@ function closeInspector() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+async function generateForensicReport(dbId) {
+    const container = document.getElementById('aiForensicContainer');
+    const btn = document.getElementById('aiReportBtn');
+    if (!container || !btn) return;
+
+    btn.disabled = true;
+    btn.innerText = '보고서 분석 중...';
+    container.innerHTML = `<div style="text-align:center; padding:10px; color:var(--dim);"><i data-lucide="loader" class="spin" size="12" style="vertical-align:middle; margin-right:4px;"></i> AI가 패킷 이상 패턴을 분석하고 있습니다...</div>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    const activeRow = document.querySelector(`.threat-feed-item[data-id="${dbId}"]`);
+    if (!activeRow) {
+        showToast('이벤트 정보를 수집할 수 없습니다.', 'danger');
+        btn.disabled = false;
+        btn.innerText = '🪄 보고서 생성';
+        return;
+    }
+
+    const d = activeRow.dataset;
+    const prompt = `[위협 포렌식 분석 요청]\n- 탐지 위협: ${d.type}\n- 상세 설명: ${d.desc}\n- 네트워크 정보: 출발지 ${d.srcIp} -> 목적지 ${d.dstIp} (프로토콜: ${d.proto}, 포트: ${d.port})\n- 수집 센서: ${d.source}\n- 패킷 메타데이터: ${d.meta}\n이 이벤트를 정밀 분석하여 관제사 보고서 형식으로 작성해줘. 1. 공격 기법 요약, 2. 비즈니스 자산 영향도, 3. 추천 방화벽 대응 규칙을 150자 내로 명확히 작성해줘.`;
+
+    try {
+        const res = await fetch('http://' + window.location.hostname + ':5001/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: prompt })
+        });
+        
+        if (!res.ok) throw new Error('AI Server offline');
+        
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = "";
+        
+        container.innerHTML = `<div id="aiForensicText" style="padding: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px dashed rgba(255, 209, 102, 0.3); color:#fff; min-height: 80px; font-family: var(--font-mono); font-size:11px; white-space:pre-wrap; overflow-y:auto; max-height:160px; line-height:1.5; text-align:left;"></div>`;
+        const textContainer = document.getElementById('aiForensicText');
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            fullText += chunk;
+            textContainer.innerText = fullText;
+            container.scrollTop = container.scrollHeight;
+        }
+        btn.innerText = '✓ 분석 완료';
+    } catch (e) {
+        container.innerHTML = `<div style="font-size:11px; color:var(--dim); text-align:center; padding:10px;"><i data-lucide="shield-alert" size="12" style="vertical-align:middle; margin-right:4px; color:var(--warning);"></i> AI 분석 데몬이 오프라인 상태입니다. (Port 5001)</div>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        btn.disabled = false;
+        btn.innerText = '🪄 보고서 생성';
+    }
+}
+
+async function investigateThreat(dbId) {
+    try {
+        const res = await fetch(`/api/threats/${dbId}/investigate`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message || '해당 침해 이벤트 조사를 개시했습니다.', 'warning');
+            const activeRow = document.querySelector(`.threat-feed-item[data-id="${dbId}"]`);
+            if (activeRow) activeRow.dataset.status = 'investigating';
+            const statusBadge = document.querySelector('#threatInspector .badge');
+            if (statusBadge) { statusBadge.innerText = '조사 중'; statusBadge.className = 'badge warning'; }
+        } else {
+            showToast(data.message || '상태 변경 처리에 실패했습니다.', 'danger');
+        }
+    } catch (e) {
+        showToast('요청 실패: 서버 통신 실패', 'danger');
+    }
+}
+
 async function blockIp(dbId, ip) {
     if (!confirm(`[경고] 출발지 IP (${ip}) 를 전사 방화벽 단에서 즉시 차단하시겠습니까?`)) return;
     try {
         const res = await fetch(`/api/threats/${dbId}/block`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-            alert('차단 정책이 성공적으로 배포되었습니다.');
-            location.reload();
+            showToast(`IP ${ip} 차단 정책을 배포했습니다.`, 'success');
+            const activeRow = document.querySelector(`.threat-feed-item[data-id="${dbId}"]`);
+            if (activeRow) activeRow.dataset.status = 'blocked';
+            const statusBadge = document.querySelector('#threatInspector .badge');
+            if (statusBadge) { statusBadge.innerText = '차단됨'; statusBadge.className = 'badge success'; }
+        } else {
+            showToast(data.message || '차단 정책 실현에 실패했습니다.', 'danger');
         }
-        else alert(data.message || '차단 처리에 실패했습니다.');
     } catch (e) {
-        alert('차단 요청 실패: 서버 런타임 오류가 발생했습니다.');
+        showToast('차단 요청 통신 중 오류가 발생했습니다.', 'danger');
     }
 }
 
-function isolateAgent(agentName) {
+async function whitelistIp(dbId) {
+    if (!confirm('이 이벤트를 오탐 예외로 등록하시겠습니까?\n동일 IP의 패킷 통과를 임시 수용합니다.')) return;
+    try {
+        const res = await fetch(`/api/threats/${dbId}/whitelist`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success || data.whitelisted) {
+            showToast(data.message || '오탐 예외로 등록하여 신뢰 그룹에 추가했습니다.', 'success');
+            const activeRow = document.querySelector(`.threat-feed-item[data-id="${dbId}"]`);
+            if (activeRow) activeRow.dataset.status = 'whitelisted';
+            const statusBadge = document.querySelector('#threatInspector .badge');
+            if (statusBadge) { statusBadge.innerText = '예외됨'; statusBadge.className = 'badge success'; }
+        } else {
+            showToast(data.message || '예외 등록 중 오류가 발생했습니다.', 'danger');
+        }
+    } catch (e) {
+        showToast('오탐 예외 전송 실패.', 'danger');
+    }
+}
+
+async function isolateAgent(agentName) {
     if (!confirm(`에이전트 단말 [${agentName}]이(가) 침해되었을 가능성이 있습니다.\n조사 목적으로 해당 단말의 외부 네트워크를 영구 격리하시겠습니까?`)) return;
-    alert(`[${agentName}] 망 분리 명령이 전파되었습니다. (Mock)`);
+    try {
+        const res = await fetch(`/api/agents/isolate/${encodeURIComponent(agentName)}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message || `[${agentName}] 격리 명령이 정상 배포되었습니다.`, 'success');
+        } else {
+            showToast(data.message || '격리 처리에 실패했습니다.', 'danger');
+        }
+    } catch (e) {
+        showToast('격리 명령 통신 중 오류가 발생했습니다.', 'danger');
+    }
 }
 
 function copyPayload() {
     const text = document.getElementById('jsonPayload').innerText;
     navigator.clipboard.writeText(text).then(() => {
-        alert('Payload가 클립보드에 복사되었습니다.');
+        showToast('Raw JSON 페이로드가 클립보드에 복사되었습니다.', 'success');
     });
+}
+
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `cyber-toast ${type}`;
+    let icon = 'info';
+    if (type === 'success') icon = 'check-circle';
+    else if (type === 'danger') icon = 'shield-alert';
+    else if (type === 'warning') icon = 'alert-triangle';
+    toast.innerHTML = `<i data-lucide="${icon}" size="16"></i><span>${DOMPurify.sanitize(message)}</span>`;
+    container.appendChild(toast);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease-in reverse forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
 }
 /*]]>*/
 </script>
@@ -682,6 +873,49 @@ function copyPayload() {
     .pg-btn:hover {
         background: var(--glass-hover);
         border-color: var(--accent);
+    }
+
+    .btn-quick-cmd {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--dim);
+        font-size: 10px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-quick-cmd:hover {
+        background: rgba(0, 242, 255, 0.08);
+        border-color: var(--accent);
+        color: #fff;
+    }
+
+    .spin { animation: spin-anim 1s linear infinite; }
+    @keyframes spin-anim { 100% { transform: rotate(360deg); } }
+
+    .cyber-toast {
+        background: rgba(10, 10, 15, 0.95);
+        border-left: 4px solid var(--accent);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease-out;
+    }
+    .cyber-toast.success { border-left-color: #06d6a0; }
+    .cyber-toast.danger { border-left-color: #ff3d5a; }
+    .cyber-toast.warning { border-left-color: #ffd166; }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
     }
 </style>
 

@@ -160,6 +160,25 @@ public class AgentService {
             log.info("Agent explicitly disconnected: {}", agentName);
         });
     }
+
+    @Transactional(readOnly = true)
+    public boolean isIsolated(String agentName) {
+        return agentRepository.findByAgentName(agentName)
+                .map(a -> "isolated".equals(a.getStatus()))
+                .orElse(false);
+    }
+
+    @Transactional
+    public Agent isolateAgent(String agentName) {
+        Agent agent = agentRepository.findByAgentName(agentName)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent", agentName));
+        agent.setStatus("isolated");
+        agent.setFirewallStatusJson("{\"isolated\":true,\"reason\":\"수동 격리\"}");
+        agent.setLastFirewallStatusAt(java.time.LocalDateTime.now());
+        Agent saved = agentRepository.save(agent);
+        log.warn("Agent ISOLATED by admin command: {}", agentName);
+        return saved;
+    }
     
     @Transactional
     public void deleteAgent(Long agentId) {

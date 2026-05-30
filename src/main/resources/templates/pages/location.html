@@ -79,6 +79,32 @@
         transition: background 0.2s; cursor: pointer;
     }
     .threat-item:hover { background: rgba(255,255,255,0.05); }
+
+    .cyber-toast {
+        background: rgba(10, 10, 15, 0.95);
+        border-left: 4px solid var(--accent);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease-out;
+        text-align: left;
+        z-index: 100000;
+    }
+    .cyber-toast.success { border-left-color: #06d6a0; }
+    .cyber-toast.danger { border-left-color: #ff3d5a; }
+    .cyber-toast.warning { border-left-color: #ffd166; }
+
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
 </style>
 
 <script>
@@ -188,7 +214,7 @@
         if (typeof lucide !== 'undefined') lucide.createIcons();
 
         if (!navigator.geolocation) {
-            alert('브라우저가 위치 정보를 지원하지 않습니다.');
+            showToast('브라우저가 위치 정보를 지원하지 않습니다.', 'danger');
             return;
         }
 
@@ -202,7 +228,7 @@
             },
             (err) => {
                 console.error(err);
-                alert("위치 정보를 가져오는 데 실패했습니다.");
+                showToast("위치 정보를 획득하지 못했습니다. (권한 거부 또는 하드웨어 응답 없음)", "danger");
             },
             { enableHighAccuracy: true }
         );
@@ -288,11 +314,8 @@
     }
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
-</script>
-</content>
-</body>
-</html>
 
+</script>
 </content>
 </body>
 </html>

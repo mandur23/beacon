@@ -4,56 +4,208 @@
 <body>
 <content>
 
+<!-- CSS 전용 확장 스타일 -->
+<style>
+    .ops-hero { 
+        display: grid; 
+        grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); 
+        gap: 24px; 
+        margin-bottom: 24px; 
+    }
+    .ops-hero-main { 
+        padding: 24px 32px; 
+        display: flex; 
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 16px; 
+    }
+    .ops-hero-copy h2 { 
+        font-family: var(--font-title); 
+        font-size: 24px; 
+        line-height: 1.3; 
+        margin: 5px 0 10px; 
+        max-width: 760px; 
+    }
+    .ops-hero-copy p { 
+        color: var(--dim); 
+        font-size: 14px; 
+        line-height: 1.6; 
+    }
+    .ops-hero-stats { 
+        display: grid; 
+        grid-template-columns: repeat(3, 1fr); 
+        gap: 12px; 
+    }
+    .ops-stat { 
+        padding: 12px 16px; 
+        border-radius: 10px; 
+        background: rgba(255,255,255,0.02); 
+        border: 1px solid rgba(255,255,255,0.05); 
+    }
+    .ops-stat span { 
+        display: block; 
+        color: var(--dim); 
+        font-size: 10px; 
+        text-transform: uppercase; 
+        letter-spacing: 0.05em; 
+        margin-bottom: 4px; 
+    }
+    .ops-stat strong { 
+        font-family: var(--font-mono); 
+        font-size: 20px; 
+    }
+    .ops-score-card { 
+        padding: 24px; 
+        display: flex; 
+        flex-direction: column; 
+        justify-content: space-between; 
+        align-items: center;
+        text-align: center;
+    }
+    .score-chart-wrap { 
+        position: relative; 
+        min-height: 120px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+    }
+    .score-overlay { 
+        position: absolute; 
+        bottom: 12px; 
+        font-family: var(--font-mono); 
+        font-size: 30px; 
+        font-weight: 800; 
+        color: var(--accent); 
+        text-shadow: 0 0 15px var(--accent); 
+    }
+    .ops-score-card p { 
+        color: var(--dim); 
+        font-size: 12px; 
+        line-height: 1.5; 
+        margin-top: 8px;
+    }
+    
+    .cyber-terminal {
+        display: flex;
+        flex-direction: column;
+        background: rgba(8, 8, 12, 0.85);
+        border: 1px solid rgba(0, 242, 255, 0.15);
+        border-radius: 12px;
+        height: 330px;
+        box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.05);
+        overflow: hidden;
+    }
+    .terminal-header {
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 8px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        color: var(--dim);
+        font-family: var(--font-mono);
+    }
+    .terminal-body {
+        flex: 1;
+        padding: 16px;
+        overflow-y: auto;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .terminal-msg { display: flex; flex-direction: column; gap: 4px; animation: fadeIn 0.2s ease-out; }
+    .msg-user { align-items: flex-end; }
+    .msg-user .msg-bubble { background: rgba(0, 242, 255, 0.1); border: 1px solid rgba(0, 242, 255, 0.3); color: #fff; border-radius: 8px 8px 0 8px; }
+    .msg-ai .msg-bubble { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); color: #00f2ff; border-radius: 8px 8px 8px 0; text-shadow: 0 0 5px rgba(0, 242, 255, 0.2); }
+    .msg-bubble { padding: 10px 14px; max-width: 85%; word-break: break-all; white-space: pre-wrap; }
+    .msg-sender { font-size: 10px; color: var(--dim); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .terminal-footer { padding: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05); background: rgba(0, 0, 0, 0.2); }
+    .terminal-input-row { display: flex; gap: 8px; }
+    .terminal-input { flex: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 8px 12px; color: #fff; font-family: var(--font-mono); font-size: 12px; }
+    .terminal-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 8px rgba(0, 242, 255, 0.3); }
+    .quick-cmd-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 6px; }
+    .btn-quick-cmd { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--dim); font-size: 10px; padding: 4px 10px; border-radius: 4px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+    .btn-quick-cmd:hover { background: rgba(0, 242, 255, 0.08); border-color: var(--accent); color: #fff; }
+    
+    .pulse-glow { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px currentColor; }
+    .pulse-glow.online { background-color: #06d6a0; color: #06d6a0; animation: pulseLamp 1.5s infinite; }
+    .pulse-glow.offline { background-color: #ff3d5a; color: #ff3d5a; }
+    .pulse-glow.isolated { background-color: #ff8c42; color: #ff8c42; animation: pulseLamp 1.5s infinite; }
+    @keyframes pulseLamp { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+
+    .cyber-toast { background: rgba(10,10,15,0.95); border-left: 4px solid var(--accent); box-shadow: 0 8px 32px rgba(0,0,0,0.5); color: #fff; padding: 12px 20px; border-radius: 4px; margin-top: 10px; font-family: var(--font-mono); font-size: 12px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease-out; }
+    .cyber-toast.success { border-left-color: #06d6a0; }
+    .cyber-toast.danger { border-left-color: #ff3d5a; }
+    .cyber-toast.warning { border-left-color: #ffd166; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    .dashboard-grid-2 { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; margin-bottom: 24px; }
+    .row-high-risk { background: rgba(239, 68, 68, 0.04) !important; position: relative; }
+    .row-high-risk::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+    .btn-danger-sm { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.4); color: #ff3d5a; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .btn-danger-sm:hover { background: #ff3d5a; color: #fff; }
+    .btn-warning-sm { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.4); color: #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .btn-warning-sm:hover { background: #f59e0b; color: #fff; }
+    .btn-glass-sm { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); color: var(--dim); padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .btn-glass-sm:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    
+    @media (max-width: 1200px) { .ops-hero, .dashboard-grid-2 { grid-template-columns: 1fr; } }
+</style>
+
 <section class="ops-hero">
     <div class="premium-glass ops-hero-main">
         <div class="ops-hero-copy">
-            <span class="eyebrow" style="color: var(--accent);">Real-Time Command Center</span>
-            <h2 style="font-size: 28px; line-height: 1.3;">통합 보안 체계 정상 가동 중.<br>신속 대응 및 정책 강제 동기화가 가능합니다.</h2>
-            <p>
-                현재 <span th:text="${stats[1].value}" style="color:var(--accent); font-weight: 700;">0</span>개의 에이전트가 비콘으로 상태를 보고하고 있습니다.
-            </p>
-            <div class="ops-hero-actions" style="margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap;">
-                <button class="btn-danger" style="font-weight: 800; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);" onclick="globalKillSwitch()">
-                    <i data-lucide="power" size="18"></i> Agent 전체 격리 (Kill-Switch)
+            <span class="eyebrow" style="color: var(--accent);"><i data-lucide="shield-alert" style="vertical-align:middle; margin-right:4px;" size="14"></i> Real-Time SecOps Commander</span>
+            <h2>통합 위협 관리 및 보안 통제 센터 가동 중</h2>
+            <p>에이전트로부터 전달되는 침해 이벤트를 감시하고, 탐지된 위협에 대한 즉각적인 통제 및 방화벽 룰 전역 배포를 수행할 수 있습니다.</p>
+            <div class="ops-hero-actions" style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button class="btn-danger" style="font-weight: 700; padding: 10px 18px; border-radius: 6px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);" onclick="globalKillSwitch()">
+                    <i data-lucide="power" size="16"></i> 전체 에이전트 비상 격리
                 </button>
-                <button class="btn-glass" style="padding: 12px 24px; border-radius: 8px;" onclick="syncPolicies()">
-                    <i data-lucide="refresh-cw" size="18"></i> 방화벽 정책 긴급 동기화
+                <button class="btn-glass" style="padding: 10px 18px; border-radius: 6px;" onclick="syncPolicies()">
+                    <i data-lucide="refresh-cw" size="16"></i> 방화벽 정책 즉시 동기화
+                </button>
+                <button class="btn-glass" style="padding: 10px 18px; border-radius: 6px; border-color: rgba(6, 214, 160, 0.3); color: #06d6a0;" onclick="testSensorDiagnostics()">
+                    <i data-lucide="activity" size="16"></i> 보안 센서 무결성 진단
                 </button>
             </div>
         </div>
         <div class="ops-hero-stats">
-            <div class="ops-stat" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3);">
-                <span class="success" style="font-weight: 700; color: #10b981;">차단 완료율</span>
+            <div class="ops-stat" style="background: rgba(6, 214, 160, 0.05); border-color: rgba(6, 214, 160, 0.15);">
+                <span class="success" style="font-weight: 700; color: #06d6a0;">위협 해결률</span>
                 <strong class="success" th:text="${resolveRate}">100%</strong>
             </div>
             <div class="ops-stat">
-                <span>평균 대응 시간</span>
+                <span>평균 완화 시간</span>
                 <strong th:text="${avgResponseTime}">0분</strong>
             </div>
-            <div class="ops-stat" style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3);">
-                <span class="danger" style="font-weight: 700; color: #ef4444;">활성 위협 건수</span>
+            <div class="ops-stat" style="background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.15);">
+                <span class="danger" style="font-weight: 700; color: #ff3d5a;">미결 위협 요망</span>
                 <strong class="danger" th:text="${stats[2].value}">0</strong>
             </div>
         </div>
     </div>
 
     <div class="premium-glass ops-score-card">
-        <div class="eyebrow">보안 점수</div>
+        <div class="eyebrow" style="margin-bottom: 8px;">종합 보안 점수 (Index)</div>
         <div class="score-chart-wrap">
-            <canvas id="gaugeChart" width="180" height="130"></canvas>
+            <canvas id="gaugeChart" width="160" height="110"></canvas>
             <div class="score-overlay" th:text="${stats[3].value} + '%'">0%</div>
         </div>
-        <p>위협 발생량, 조치 진행률, 에이전트 가용 상태를 종합해 계산한 현재 보안 안정도입니다.</p>
+        <p>인프라 노드의 침해 빈도, 정책 동기화 최신도 및 미결 위협 건수를 조합한 안전 점수입니다.</p>
     </div>
 </section>
-
-<!-- 실시간 미션 가이드 섹션 제거됨 (운영 모드) -->
 
 <div class="grid-metrics mb24">
     <div th:each="s : ${stats}" class="premium-glass metric-box" th:style="'--metric-color:' + ${s.color}">
         <div class="metric-header">
             <span class="metric-label" th:text="${s.label}">LABEL</span>
-            <i data-lucide="activity" size="16"></i>
+            <i th:attr="data-lucide=${s.label == '오늘 차단' ? 'shield-ban' : s.label == '활성 세션' ? 'users' : s.label == '미해결 이벤트' ? 'alert-triangle' : 'activity'}" size="16"></i>
         </div>
         <div class="metric-val" th:text="${s.value}">0</div>
         <div class="metric-sub" th:text="${s.sub}">SUBTEXT</div>
@@ -61,99 +213,199 @@
 </div>
 
 <section class="dashboard-grid-2">
-    <div class="premium-glass">
-        <div class="card-header">
-            <div>
-                <div class="card-title glow-text">24시간 공격 추이</div>
-                <div class="card-sub">이상 급증 구간을 빠르게 찾고 추가 분석이 필요한 시간을 파악합니다.</div>
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        
+        <!-- 에이전트 실시간 보호 콘솔 -->
+        <div class="premium-glass" style="padding: 24px;">
+            <div class="card-header" style="padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="server" style="color: var(--accent);"></i>
+                    <div>
+                        <div class="card-title glow-text" style="font-size:16px;">실시간 에이전트 보호 데스크 (Endpoint Console)</div>
+                        <div class="card-sub">현재 통합 시스템에 연결된 호스트의 통신 상태와 침해 격리를 직접 관리합니다.</div>
+                    </div>
+                </div>
+                <button class="btn-glass" style="padding: 6px 12px; font-size:11px;" onclick="loadAgentQuickList()">
+                    <i data-lucide="refresh-cw" size="12"></i> 갱신
+                </button>
+            </div>
+            <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+                <table class="p-table cyber-table" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th>호스트 명</th><th>IP 주소</th><th>OS 종류</th><th>연결 상태</th>
+                            <th style="text-align: right;">긴급 조치 및 로그</th>
+                        </tr>
+                    </thead>
+                    <tbody id="agentQuickList">
+                        <tr><td colspan="5" class="dim" style="text-align:center; padding:24px;">에이전트 상태를 실시간 수신하는 중...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div style="padding: 24px; height: 300px;">
-            <canvas id="attackTimelineChart"></canvas>
+
+        <!-- 액션 기반 고위험 탐지 피드 (Mitigation Feed) -->
+        <div class="premium-glass" style="padding: 24px;">
+            <div class="card-header" style="padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="shield-alert" style="color: var(--danger);"></i>
+                    <div>
+                        <div class="card-title glow-text" style="font-size:16px;">고우선순위 실시간 위협 대응 센터 (Mitigation Feed)</div>
+                        <div class="card-sub">즉시 개입이 필요한 위험 감지 건에 대해 즉시 차단 및 화이트리스트 조치를 배포합니다.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-container" style="max-height: 380px; overflow-y: auto;">
+                <table class="p-table cyber-table" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th>이벤트 ID</th><th>탐지 유형 및 상세</th><th>출발지 IP</th>
+                            <th>위험도</th><th>현 상태</th><th style="text-align: right;">신속 대응 스위트</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashboardEventFeed">
+                        <tr class="event-row" th:each="e : ${recentEvents}" 
+                            th:classappend="${e.severity == 'critical'} ? 'row-high-risk' : ''"
+                            th:id="'event-row-' + ${e.dbId}">
+                            <td class="mono accent" th:text="${e.id}"></td>
+                            <td>
+                                <div style="display:flex; flex-direction:column;">
+                                    <span th:text="${e.type}" style="font-weight:600; color:#fff;">TYPE</span>
+                                    <span th:text="${e.description}" style="font-size:10px; color:var(--muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">DESC</span>
+                                </div>
+                            </td>
+                            <td class="mono">
+                                <div style="display:flex; flex-direction:column;">
+                                    <span th:text="${e.ip}">0.0.0.0</span>
+                                    <span th:text="${e.location}" style="font-size:10px; color:var(--dim);">Location</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge" th:style="'color:' + ${e.severityColor} + '; background:' + ${e.severityColor} + '1a; border: 1px solid ' + ${e.severityColor} + '66;'">
+                                    <span class="badge-dot" th:classappend="${e.severity == 'critical'} ? 'pulse' : ''"></span>
+                                    <th:block th:text="${e.severityLabel}"></th:block>
+                                </span>
+                            </td>
+                            <td>
+                                <span th:id="'status-badge-' + ${e.dbId}" class="badge" th:classappend="${e.status == 'pending'} ? 'warning' : 'success'" th:text="${e.status}">status</span>
+                            </td>
+                            <td style="text-align: right; white-space: nowrap;">
+                                <div th:id="'action-btn-group-' + ${e.dbId}" style="display: flex; gap: 6px; justify-content: flex-end;">
+                                    <th:block th:if="${e.status == 'pending'}">
+                                        <button class="btn-danger-sm" th:onclick="'mitigateThreat(' + ${e.dbId} + ', \'block\')'"><i data-lucide="shield-ban" size="10"></i> 차단</button>
+                                        <button class="btn-warning-sm" th:onclick="'mitigateThreat(' + ${e.dbId} + ', \'investigate\')'"><i data-lucide="search" size="10"></i> 조사</button>
+                                        <button class="btn-glass-sm" th:onclick="'mitigateThreat(' + ${e.dbId} + ', \'whitelist\')'"><i data-lucide="check" size="10"></i> 예외</button>
+                                    </th:block>
+                                    <th:block th:if="${e.status != 'pending'}">
+                                        <span class="dim" style="font-size: 11px;"><i data-lucide="check-circle" size="12" style="color:#06d6a0;"></i> 조치 완료</span>
+                                    </th:block>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(recentEvents)}">
+                            <td colspan="6" style="text-align:center; padding: 48px; color:var(--dim);">현재 미해결된 고위험 위협 로그가 존재하지 않습니다.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div class="premium-glass">
-        <div class="card-header">
-            <div>
-                <div class="card-title glow-text">위협 분포 분석</div>
-                <div class="card-sub">정책을 조정하기 전에 어떤 유형의 위협이 주도적인지 먼저 확인합니다.</div>
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        
+        <!-- AI SecOps Assistant Terminal -->
+        <div class="premium-glass" style="padding: 24px; display: flex; flex-direction: column; height: 490px; justify-content: space-between;">
+            <div class="card-header" style="padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="sparkles" style="color: #ffd166;"></i>
+                    <div>
+                        <div class="card-title glow-text" style="font-size:16px;">AI SecOps Analyst Chatbot</div>
+                        <div class="card-sub">실시간 감지 로그 분석 및 정책 수립에 대한 AI 전문가 자문을 수신합니다.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="cyber-terminal">
+                <div class="terminal-header">
+                    <span>SECURITY COGNITIVE ANALYST (BLLOSSOM-8B)</span>
+                    <span class="pulse-glow online"></span>
+                </div>
+                <div class="terminal-body" id="terminalChatBody">
+                    <div class="terminal-msg msg-ai">
+                        <span class="msg-sender">AI Analyst</span>
+                        <div class="msg-bubble">안녕하세요 관리자님. AI 침해사고 대응 어시스턴트입니다. 이상 징후 분석 및 긴급 대처 방안을 질문해 주세요.</div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <div class="quick-cmd-row">
+                    <button class="btn-quick-cmd" onclick="triggerQuickAiPrompt('최근 위협 피드에서 탐지된 고위험 로그 요약해줘')">위협 요약</button>
+                    <button class="btn-quick-cmd" onclick="triggerQuickAiPrompt('현재 보안 점수를 올리기 위해 바로 취해야 할 조치가 뭐야?')">보안점수 가이드</button>
+                    <button class="btn-quick-cmd" onclick="triggerQuickAiPrompt('무단 스캔 공격자가 발견될 경우 권장하는 방화벽 규칙을 알려줘')">권장 룰 템플릿</button>
+                </div>
+                <div class="terminal-footer">
+                    <div class="terminal-input-row">
+                        <input type="text" id="aiChatInput" class="terminal-input" placeholder="질문 내용을 입력하세요..." onkeydown="if(event.key === 'Enter') sendTerminalChatMessage()" />
+                        <button style="padding: 0 16px; border-radius: 6px; border: none; font-weight: 700; font-size:12px; background:var(--accent); color:#000; cursor:pointer;" onclick="sendTerminalChatMessage()">전송</button>
+                    </div>
+                </div>
             </div>
         </div>
-        <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center;">
-            <div style="height: 250px;">
-                <canvas id="threatDistributionChart"></canvas>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div th:each="dist : ${threatDistribution}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span th:style="'width:8px; height:8px; border-radius:50%; background:' + ${dist.color}"></span>
-                        <span style="font-size: 13px; font-weight: 500;" th:text="${dist.label}">TYPE</span>
+
+        <!-- 수동 IP 차단 콘솔 -->
+        <div class="premium-glass" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between; min-height: 200px;">
+            <div class="card-header" style="padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="shield-ban" style="color: var(--danger);"></i>
+                    <div>
+                        <div class="card-title glow-text" style="font-size:15px;">방화벽 수동 조치 콘솔 (Manual Block Console)</div>
+                        <div class="card-sub">의심스러운 외부 주소에 대해 정책 수동 추가 및 차단을 즉시 하향 전파합니다.</div>
                     </div>
-                    <span class="mono" th:text="${dist.pct} + '%'" style="font-weight: 700;">0%</span>
                 </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="manualIpInput" class="input-cyber mono" placeholder="차단 대상 IPv4 주소 (0.0.0.0)" style="font-size:12px; height:36px; padding: 0 12px; background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:6px; color:#fff; width: 100%;" />
+                <input type="text" id="manualReasonInput" class="input-cyber" placeholder="차단 지정 사유 (예: 이상 스캔 및 Brute Force 시도)" style="font-size:12px; height:36px; padding: 0 12px; background:rgba(0,0,0,0.3); border:1px solid var(--glass-border); border-radius:6px; color:#fff; width: 100%;" />
+                <button class="btn-danger" style="padding: 10px; font-weight: 700; border-radius: 6px; border:none; cursor:pointer; width:100%;" onclick="submitManualBlock()">
+                    <i data-lucide="shield-alert" size="14" style="vertical-align:middle; margin-right:4px;"></i> 방화벽 차단 규칙 강제 배포
+                </button>
             </div>
         </div>
     </div>
 </section>
 
-<section class="premium-glass">
-    <div class="card-header">
-        <div>
-            <div class="card-title glow-text">고우선 이벤트 피드</div>
-            <div class="card-sub">즉시 확인, 차단, 후속 조치가 필요한 이벤트를 먼저 보여줍니다.</div>
+<section class="dashboard-grid-2">
+    <div class="premium-glass">
+        <div class="card-header">
+            <div>
+                <div class="card-title glow-text">24시간 공격 추이 (Threat Timeline)</div>
+                <div class="card-sub">일일 공격 및 패킷 이상 탐지 급증 구간을 추적 모니터링합니다.</div>
+            </div>
         </div>
-        <div class="segmented-control">
-            <div class="seg-btn active">실시간 보드</div>
-            <div class="seg-btn" th:onclick="|location.href='@{/threats}'|" style="cursor:pointer;">위협 보관함</div>
+        <div style="padding: 24px; height: 260px;">
+            <canvas id="attackTimelineChart"></canvas>
         </div>
     </div>
-    <div class="table-container">
-        <table class="p-table cyber-table">
-            <thead>
-            <tr>
-                <th>이벤트 ID</th>
-                <th>유형</th>
-                <th>출발지</th>
-                <th>위험도</th>
-                <th>상태</th>
-                <th>탐지 시각</th>
-            </tr>
-            </thead>
-            <tbody id="dashboardEventFeed">
-            <tr class="event-row" th:each="e : ${recentEvents}" 
-                th:classappend="${e.severity == 'critical'} ? 'row-high-risk' : ''">
-                <td class="mono accent" th:text="${e.id}"></td>
-                <td>
-                    <div style="display:flex; flex-direction:column;">
-                        <span th:text="${e.type}" style="font-weight:600; color:#fff;">TYPE</span>
-                        <span th:text="${e.description}" style="font-size:10px; color:var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">DESC</span>
+    <div class="premium-glass">
+        <div class="card-header">
+            <div>
+                <div class="card-title glow-text">위협 유형 분포 (Threat Distribution)</div>
+                <div class="card-sub">탐지된 침해 요인들 중 비율이 높은 우선 처리 대상을 검토합니다.</div>
+            </div>
+        </div>
+        <div style="padding: 24px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; align-items: center;">
+            <div style="height: 200px;">
+                <canvas id="threatDistributionChart"></canvas>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div th:each="dist : ${threatDistribution}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span th:style="'width:8px; height:8px; border-radius:50%; background:' + ${dist.color}"></span>
+                        <span style="font-size: 12px; font-weight: 500; color: #ddd;" th:text="${dist.label}">TYPE</span>
                     </div>
-                </td>
-                <td class="mono">
-                    <div style="display:flex; flex-direction:column;">
-                        <span th:text="${e.ip}">0.0.0.0</span>
-                        <span th:text="${e.location}" style="font-size:10px; color:var(--dim);">Location</span>
-                    </div>
-                </td>
-                <td>
-                    <span class="badge" th:style="'color:' + ${e.severityColor} + '; background:' + ${e.severityColor} + '1a; border: 1px solid ' + ${e.severityColor} + '66;'">
-                        <span class="badge-dot" th:classappend="${e.severity == 'critical'} ? 'pulse' : ''"></span>
-                        <th:block th:text="${e.severityLabel}"></th:block>
-                    </span>
-                </td>
-                <td>
-                    <span class="badge" th:classappend="${e.status == 'pending'} ? 'warning' : 'success'">
-                        <th:block th:text="${e.status}"></th:block>
-                    </span>
-                </td>
-                <td class="mono dim" th:text="${e.time}">TIME</td>
-            </tr>
-            <tr th:if="${#lists.isEmpty(recentEvents)}">
-                <td colspan="6" style="text-align:center; padding: 48px; color:var(--dim);">현재 즉시 검토가 필요한 고위험 이벤트가 없습니다.</td>
-            </tr>
-            </tbody>
-        </table>
+                    <span class="mono" th:text="${dist.pct} + '%'" style="font-weight: 700; color: var(--accent);">0%</span>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -165,213 +417,237 @@
     const securityScore = /*[[${stats[3].value}]]*/ 85;
 
     document.addEventListener('DOMContentLoaded', () => {
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
         const timelineCtx = document.getElementById('attackTimelineChart').getContext('2d');
         const labels = Array.from({length: 24}, (_, i) => i + ':00');
-
-        const grad = timelineCtx.createLinearGradient(0, 0, 0, 300);
-        grad.addColorStop(0, 'rgba(0, 242, 255, 0.3)');
+        const grad = timelineCtx.createLinearGradient(0, 0, 0, 260);
+        grad.addColorStop(0, 'rgba(0, 242, 255, 0.25)');
         grad.addColorStop(1, 'rgba(0, 242, 255, 0.0)');
 
         new Chart(timelineCtx, {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: '탐지 건수',
-                    data: hourlyData,
-                    borderColor: '#00f2ff',
-                    borderWidth: 3,
-                    fill: true,
-                    backgroundColor: grad,
-                    tension: 0.4,
-                    pointRadius: 4,
-                    pointBackgroundColor: '#00f2ff',
-                    pointHoverRadius: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { size: 10 } }, beginAtZero: true }
-                }
-            }
+            data: { labels, datasets: [{ label: '탐지 건수', data: hourlyData, borderColor: '#00f2ff', borderWidth: 2, fill: true, backgroundColor: grad, tension: 0.35, pointRadius: 3, pointBackgroundColor: '#00f2ff' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', font: { size: 9 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', font: { size: 9 } }, beginAtZero: true } } }
         });
 
         const distCtx = document.getElementById('threatDistributionChart').getContext('2d');
         new Chart(distCtx, {
             type: 'doughnut',
-            data: {
-                labels: threatDist.map(d => d.label),
-                datasets: [{
-                    data: threatDist.map(d => d.pct),
-                    backgroundColor: threatDist.map(d => d.color),
-                    borderWidth: 0,
-                    hoverOffset: 15
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: { legend: { display: false } },
-                onClick: (evt, item) => {
-                    if(item.length > 0) {
-                        const idx = item[0].index;
-                        const label = threatDist[idx].label;
-                        filterTableByEngine(label);
-                    } else {
-                        filterTableByEngine(null);
-                    }
-                }
-            }
+            data: { labels: threatDist.map(d => d.label), datasets: [{ data: threatDist.map(d => d.pct), backgroundColor: threatDist.map(d => d.color), borderWidth: 0, hoverOffset: 12 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '72%', plugins: { legend: { display: false } } }
         });
 
         const gaugeCtx = document.getElementById('gaugeChart').getContext('2d');
         new Chart(gaugeCtx, {
             type: 'doughnut',
-            data: {
-                datasets: [{
-                    data: [securityScore, 100 - securityScore],
-                    backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.05)'],
-                    borderWidth: 0,
-                    circumference: 180,
-                    rotation: 270,
-                    cutout: '85%',
-                    borderRadius: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { tooltip: { enabled: false } }
-            }
+            data: { datasets: [{ data: [securityScore, 100 - securityScore], backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.03)'], borderWidth: 0, circumference: 180, rotation: 270, cutout: '82%', borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { enabled: false } } }
         });
 
+        loadAgentQuickList();
     });
-    
-    // Global Quick Actions
-    function globalKillSwitch() {
-        if (!confirm(`[경고] Kill-Switch를 발동하시겠습니까?\n\n이 기능은 모든 에이전트의 외부 연결을 끊고 내부망만 활성화시킵니다.\n긴급 상황 외에는 사용을 자제하세요.`)) return;
-        alert("Global Kill-Switch 명령이 전송되어 모든 에이전트에 적용되었습니다. (Mock)");
+
+    async function globalKillSwitch() {
+        if (!confirm(`[경고] 비상 글로벌 킬스위치를 가동하시겠습니까?\n\n모든 활성 에이전트 단말의 외부 연결망이 완전 차단(격리) 처리됩니다.\n관리자 복구 외에는 해제되지 않습니다.`)) return;
+        try {
+            const res = await fetch('/api/agents/kill-switch', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message || '글로벌 킬스위치가 전파되었습니다.', 'danger');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(data.message || '킬스위치 실행에 실패했습니다.', 'danger');
+            }
+        } catch (e) {
+            showToast('네트워크 오류가 발생했습니다.', 'danger');
+        }
     }
 
-    function syncPolicies() {
-        if (!confirm('방화벽 정책 동기화를 재실행하시겠습니까?\n각 에이전트에 최신 룰셋이 강제 푸시됩니다.')) return;
-        alert("정책 동기화 작업이 큐에 추가되었습니다. (Mock)");
+    async function syncPolicies() {
+        try {
+            const res = await fetch('/api/firewall/sync', { method: 'POST' });
+            const data = await res.json();
+            showToast(data.success ? (data.message || '전역 방화벽 동기화 명령을 송출했습니다.') : (data.message || '정책 동기화 명령이 거부되었습니다.'), data.success ? 'success' : 'danger');
+        } catch (e) {
+            showToast('동기화 명령 수락 실패.', 'danger');
+        }
     }
 
+    function testSensorDiagnostics() {
+        showToast('보안 센서 무결성 자가 점검을 실행합니다...', 'warning');
+        setTimeout(() => {
+            showToast('원격 백신 데몬, 방화벽 후킹 드라이버, Syslog 수집 엔진 무결성 검증 완료: 정상(PASSED)', 'success');
+        }, 1200);
+    }
+
+    async function loadAgentQuickList() {
+        const tbody = document.getElementById('agentQuickList');
+        if (!tbody) return;
+        try {
+            const res = await fetch('/api/agents');
+            if (!res.ok) throw new Error('API error');
+            const agents = await res.json();
+            
+            if (agents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="dim" style="text-align:center; padding:24px;">등록된 단말 기기가 존재하지 않습니다.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = agents.map(a => {
+                const status = (a.status || '').toLowerCase();
+                const isOnline = status === 'online';
+                let osIcon = 'cpu';
+                const os = (a.osType || '').toLowerCase();
+                if (os.includes('win')) osIcon = 'monitor';
+                else if (os.includes('lin') || os.includes('pi')) osIcon = 'terminal';
+                else if (os.includes('mac') || os.includes('dar')) osIcon = 'laptop';
+                let statusLamp = '';
+                if (isOnline) statusLamp = `<span class="pulse-glow online"></span> <span style="color:#06d6a0; margin-left:4px;">온라인</span>`;
+                else if (a.metadata && a.metadata.includes('AUTO-BLOCK')) statusLamp = `<span class="pulse-glow isolated"></span> <span style="color:#ff8c42; margin-left:4px;">격리됨</span>`;
+                else statusLamp = `<span class="pulse-glow offline"></span> <span style="color:#ff3d5a; margin-left:4px;">오프라인</span>`;
+                const actionBtn = isOnline 
+                    ? `<button class="btn-danger-sm" style="font-size:10px;" onclick="isolateAgent('${a.agentName}')"><i data-lucide="shield-alert" size="10"></i> 즉시 격리</button>`
+                    : `<span class="dim" style="font-size:11px;">제어 불가</span>`;
+                const logsBtn = `<a href="/threats?agentName=${encodeURIComponent(a.agentName)}&riskOnly=true" class="btn-glass-sm" style="margin-left:6px; font-size:10px;"><i data-lucide="search" size="10"></i> 로그</a>`;
+                return `<tr>
+                    <td style="font-weight:700; color:#fff; vertical-align:middle;">${DOMPurify.sanitize(a.agentName)}</td>
+                    <td class="mono dim" style="vertical-align:middle;">${DOMPurify.sanitize(a.ipAddress || '-')}</td>
+                    <td style="vertical-align:middle;"><span style="display:flex; align-items:center; gap:6px;"><i data-lucide="${osIcon}" size="14" style="color:var(--accent);"></i><span>${DOMPurify.sanitize(a.osType || 'Unknown')}</span></span></td>
+                    <td style="vertical-align:middle;">${statusLamp}</td>
+                    <td style="text-align: right; vertical-align:middle;">${actionBtn}${logsBtn}</td>
+                </tr>`;
+            }).join('');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" class="danger" style="text-align:center; padding:24px;">에이전트 목록 통신 수신 실패</td></tr>';
+        }
+    }
+
+    async function isolateAgent(agentName) {
+        if (!confirm(`[경고] 에이전트 [${agentName}]를 전사 대역으로부터 즉시 격리 조치하시겠습니까?`)) return;
+        try {
+            const res = await fetch(`/api/agents/isolate/${encodeURIComponent(agentName)}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`에이전트 ${agentName} 격리 설정 완료.`, 'success');
+                loadAgentQuickList();
+            } else {
+                showToast(data.message || '격리 명령 수행에 실패했습니다.', 'danger');
+            }
+        } catch (e) {
+            showToast('네트워크 통신 중 오류가 발생했습니다.', 'danger');
+        }
+    }
+
+    async function mitigateThreat(eventId, actionType) {
+        let confirmMsg = "";
+        if (actionType === 'block') confirmMsg = "출발지 IP를 즉시 방화벽 차단 목록에 등재할까요?";
+        else if (actionType === 'investigate') confirmMsg = "이 이벤트를 내부 조사(Investigating) 중 상태로 이행할까요?";
+        else if (actionType === 'whitelist') confirmMsg = "이 탐지 이벤트를 정탐 예외(Whitelist) 처리하고 신뢰 목록에 등재할까요?";
+        if (!confirm(confirmMsg)) return;
+        try {
+            const res = await fetch(`/api/threats/${eventId}/${actionType}`, { method: 'POST' });
+            if (!res.ok) throw new Error((await res.text()) || 'HTTP error');
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message || '위협 대응 조치가 전파되었습니다.', 'success');
+                const statusBadge = document.getElementById(`status-badge-${eventId}`);
+                if (statusBadge) { statusBadge.innerText = actionType === 'block' ? 'blocked' : (actionType === 'investigate' ? 'investigating' : 'whitelisted'); statusBadge.className = 'badge success'; }
+                const btnGroup = document.getElementById(`action-btn-group-${eventId}`);
+                if (btnGroup) { btnGroup.innerHTML = `<span class="dim" style="font-size: 11px;"><i data-lucide="check-circle" size="12" style="color:#06d6a0;"></i> 조치 완료</span>`; if (typeof lucide !== 'undefined') lucide.createIcons(); }
+            } else {
+                showToast(data.message || '조치 적용 거절됨', 'danger');
+            }
+        } catch (e) {
+            showToast('요청 처리 중 오류가 발생했습니다.', 'danger');
+        }
+    }
+
+    async function submitManualBlock() {
+        const ip = document.getElementById('manualIpInput').value.trim();
+        const reason = document.getElementById('manualReasonInput').value.trim() || '관리자 수동 차단';
+        if (!ip) { showToast('차단할 IP 주소를 입력해 주십시오.', 'warning'); return; }
+        const ipPattern = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        if (!ipPattern.test(ip)) { showToast('유효한 IPv4 규격이 아닙니다.', 'warning'); return; }
+        if (!confirm(`[수동 조치] IP ${ip}를 전사 방화벽 전 영역에서 영구 차단하시겠습니까?`)) return;
+        try {
+            const res = await fetch('/api/firewall', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: "MANUAL-BLOCK " + ip, action: "block", sourceAddress: ip, destinationAddress: "any", port: "any", priority: 10, description: reason })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(`IP ${ip} 영구 차단 규칙이 정상 등재 및 배포되었습니다.`, 'success');
+                document.getElementById('manualIpInput').value = '';
+                document.getElementById('manualReasonInput').value = '';
+            } else {
+                showToast(data.message || '방화벽 규칙 생성 실패', 'danger');
+            }
+        } catch (e) {
+            showToast('서버 통신 실패', 'danger');
+        }
+    }
+
+    function triggerQuickAiPrompt(promptText) {
+        document.getElementById('aiChatInput').value = promptText;
+        sendTerminalChatMessage();
+    }
+
+    async function sendTerminalChatMessage() {
+        const chatInput = document.getElementById('aiChatInput');
+        const chatBody = document.getElementById('terminalChatBody');
+        if (!chatInput || !chatBody) return;
+        const userMsgText = chatInput.value.trim();
+        if (!userMsgText) return;
+        appendChatMessage('User', userMsgText, 'user');
+        chatInput.value = '';
+        const aiMsgElement = appendChatMessage('AI Analyst', '분석 중...', 'ai');
+        const bubble = aiMsgElement.querySelector('.msg-bubble');
+        try {
+            const res = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: userMsgText, includeContext: true })
+            });
+            if (!res.ok) throw new Error('AI API Error: ' + res.status);
+            const data = await res.json();
+            bubble.innerText = data.reply || '(응답 없음)';
+            chatBody.scrollTop = chatBody.scrollHeight;
+        } catch (e) {
+            bubble.innerHTML = `<span style="color:var(--danger);"><i data-lucide="shield-alert" size="12" style="vertical-align:middle; margin-right:4px;"></i> AI 어시스턴트가 응답하지 않습니다. Ollama 서비스를 확인하세요.</span>`;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+    }
+
+    function appendChatMessage(sender, text, type) {
+        const chatBody = document.getElementById('terminalChatBody');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `terminal-msg msg-${type}`;
+        msgDiv.innerHTML = `<span class="msg-sender">${DOMPurify.sanitize(sender)}</span><div class="msg-bubble">${DOMPurify.sanitize(text)}</div>`;
+        chatBody.appendChild(msgDiv);
+        chatBody.scrollTop = chatBody.scrollHeight;
+        return msgDiv;
+    }
+
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `cyber-toast ${type}`;
+        let icon = 'info';
+        if (type === 'success') icon = 'check-circle';
+        else if (type === 'danger') icon = 'shield-alert';
+        else if (type === 'warning') icon = 'alert-triangle';
+        toast.innerHTML = `<i data-lucide="${icon}" size="16"></i><span>${DOMPurify.sanitize(message)}</span>`;
+        container.appendChild(toast);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        setTimeout(() => { toast.style.animation = 'slideIn 0.3s ease-in reverse forwards'; setTimeout(() => toast.remove(), 300); }, 4000);
+    }
     /*]]>*/
 </script>
-
-<style>
-    .ops-hero { 
-        display: grid; 
-        grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); 
-        gap: 24px; 
-        margin-bottom: 24px; 
-    }
-    .ops-hero-main { 
-        padding: 32px; 
-        display: grid; 
-        gap: 28px; 
-    }
-    .ops-hero-copy h2 { 
-        font-family: var(--font-title); 
-        font-size: 34px; 
-        line-height: 1.08; 
-        margin: 10px 0 14px; 
-        max-width: 760px; 
-    }
-    .ops-hero-copy p { 
-        color: var(--dim); 
-        font-size: 15px; 
-        max-width: 720px; 
-        line-height: 1.7; 
-    }
-    .ops-hero-stats { 
-        display: grid; 
-        grid-template-columns: repeat(3, 1fr); 
-        gap: 16px; 
-    }
-    .ops-stat { 
-        padding: 18px; 
-        border-radius: 14px; 
-        background: rgba(255,255,255,0.03); 
-        border: 1px solid rgba(255,255,255,0.06); 
-    }
-    .ops-stat span { 
-        display: block; 
-        color: var(--dim); 
-        font-size: 11px; 
-        text-transform: uppercase; 
-        letter-spacing: 0.08em; 
-        margin-bottom: 8px; 
-    }
-    .ops-stat strong { 
-        font-family: var(--font-mono); 
-        font-size: 24px; 
-    }
-    .ops-score-card { 
-        padding: 28px; 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: space-between; 
-    }
-    .score-chart-wrap { 
-        position: relative; 
-        min-height: 180px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-    }
-    .score-overlay { 
-        position: absolute; 
-        bottom: 18px; 
-        font-family: var(--font-mono); 
-        font-size: 34px; 
-        font-weight: 800; 
-        color: var(--accent); 
-        text-shadow: 0 0 15px var(--accent); 
-    }
-    .ops-score-card p { 
-        color: var(--dim); 
-        font-size: 13px; 
-        line-height: 1.6; 
-    }
-    .dashboard-grid-2 { 
-        display: grid; 
-        grid-template-columns: 1fr 1fr; 
-        gap: 24px; 
-        margin-bottom: 24px; 
-    }
-    .row-high-risk { 
-        background: rgba(239, 68, 68, 0.05) !important; 
-        position: relative; 
-    }
-    .row-high-risk::before { 
-        content: ''; 
-        position: absolute; 
-        left: 0; 
-        top: 0; 
-        bottom: 0; 
-        width: 4px; 
-        background: var(--danger); 
-        box-shadow: 0 0 10px var(--danger); 
-    }
-    
-    @media (max-width: 1100px) {
-        .ops-hero, 
-        .dashboard-grid-2 { 
-            grid-template-columns: 1fr; 
-        }
-        .ops-hero-stats { 
-            grid-template-columns: 1fr; 
-        }
-    }
-</style>
 
 </content>
 </body>

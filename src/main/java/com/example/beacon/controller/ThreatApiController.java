@@ -53,4 +53,19 @@ public class ThreatApiController {
                 "message", "이벤트 " + event.getId() + " 조사가 시작되었습니다"
         ));
     }
+
+    @PostMapping("/{id}/whitelist")
+    public ResponseEntity<Map<String, Object>> whitelistEvent(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails user) {
+        if (user == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("success", false, "message", "인증이 필요합니다"));
+        }
+        SecurityEvent event = securityEventService.whitelistEvent(id, user.getUsername());
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "이벤트 " + event.getId() + " 예외처리(화이트리스트) 등록되었습니다"
+        ));
+    }
 }

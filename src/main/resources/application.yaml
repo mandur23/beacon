@@ -17,10 +17,15 @@ spring:
     password: ${BEACON_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
+      maximum-pool-size: ${BEACON_DB_POOL_SIZE:25}
+      minimum-idle: ${BEACON_DB_POOL_MIN_IDLE:5}
+      connection-timeout: ${BEACON_DB_CONNECTION_TIMEOUT_MS:30000}
+      leak-detection-threshold: ${BEACON_DB_LEAK_DETECTION_MS:0}
       data-source-properties:
         rewriteBatchedStatements: true
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <style>
+      .title { font: bold 36px Arial, sans-serif; fill: #1a1a2e; }
+      .subtitle { font: 18px Arial, sans-serif; fill: #555; }
+      .tbl-title { font: bold 15px Arial, sans-serif; fill: #fff; }
+      .col-pk { font: bold 12px Consolas, monospace; fill: #1a1a2e; }
+      .col-fk { font: 12px Consolas, monospace; fill: #0d47a1; }
+      .col { font: 12px Consolas, monospace; fill: #333; }
+      .legend { font: 13px Arial, sans-serif; fill: #444; }
+      .rel-label { font: 11px Arial, sans-serif; fill: #666; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#5c6bc0"/>
+    </marker>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#fafbfc"/>
+  <rect x="40" y="30" width="1840" height="1020" rx="12" fill="#fff" stroke="#e0e4ea" stroke-width="2"/>
+
+  <text x="80" y="85" class="title">Beacon Database ERD</text>
+  <text x="80" y="118" class="subtitle">MySQL - Flyway V1-V16 - 10 tables</text>
+
+  <rect x="1480" y="55" width="360" height="72" rx="6" fill="#f5f7fa" stroke="#dde2e8"/>
+  <text x="1500" y="82" class="legend">PK = Primary Key  FK = Foreign Key  UK = Unique</text>
+  <text x="1500" y="104" class="legend">--- 1:N relationship</text>
+  <circle cx="1505" cy="118" r="5" fill="#5c6bc0"/>
+  <text x="1518" y="122" class="legend">Optional FK (nullable)</text>
+
+  <g id="users">
+    <rect x="80" y="160" width="280" height="300" rx="8" fill="#fff" stroke="#3949ab" stroke-width="2.5"/>
+    <rect x="80" y="160" width="280" height="36" rx="8" fill="#3949ab"/>
+    <rect x="80" y="188" width="280" height="8" fill="#3949ab"/>
+    <text x="95" y="185" class="tbl-title">users</text>
+    <text x="95" y="218" class="col-pk">PK  id</text>
+    <text x="95" y="238" class="col">username (UK)</text>
+    <text x="95" y="258" class="col">password, email (UK)</text>
+    <text x="95" y="278" class="col">name, role</text>
+    <text x="95" y="298" class="col">enabled, mfa_enabled</text>
+    <text x="95" y="318" class="col">mfa_secret</text>
+    <text x="95" y="338" class="col">login_attempts</text>
+    <text x="95" y="358" class="col">last_login_at, locked_until</text>
+    <text x="95" y="378" class="col">created_at, updated_at</text>
+  </g>
+
+  <g id="user_sessions">
+    <rect x="420" y="160" width="300" height="320" rx="8" fill="#fff" stroke="#5c6bc0" stroke-width="2"/>
+    <rect x="420" y="160" width="300" height="36" rx="8" fill="#5c6bc0"/>
+    <rect x="420" y="188" width="300" height="8" fill="#5c6bc0"/>
+    <text x="435" y="185" class="tbl-title">user_sessions</text>
+    <text x="435" y="218" class="col-pk">PK  id</text>
+    <text x="435" y="238" class="col-fk">FK  user_id -&gt; users</text>
+    <text x="435" y="258" class="col">session_token (UK)</text>
+    <text x="435" y="278" class="col">ip_address, user_agent</text>
+    <text x="435" y="298" class="col">device_type, location</text>
+    <text x="435" y="318" class="col">created_at, last_activity_at</text>
+    <text x="435" y="338" class="col">expires_at, is_active</text>
+    <text x="435" y="358" class="col">request_count</text>
+    <text x="435" y="378" class="col">risk_score, risk_factors</text>
+  </g>
+
+  <line x1="360" y1="280" x2="420" y2="280" stroke="#5c6bc0" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="365" y="268" class="rel-label">1:N CASCADE</text>
+
+  <g id="agents">
+    <rect x="80" y="520" width="300" height="380" rx="8" fill="#fff" stroke="#00897b" stroke-width="2.5"/>
+    <rect x="80" y="520" width="300" height="36" rx="8" fill="#00897b"/>
+    <rect x="80" y="548" width="300" height="8" fill="#00897b"/>
+    <text x="95" y="545" class="tbl-title">agents</text>
+    <text x="95" y="578" class="col-pk">PK  id</text>
+    <text x="95" y="598" class="col">agent_name (UK)</text>
+    <text x="95" y="618" class="col">hostname, ip_address</text>
+    <text x="95" y="638" class="col">os_type, os_version</text>
+    <text x="95" y="658" class="col">agent_version, username</text>
+    <text x="95" y="678" class="col">status, registered_at</text>
+    <text x="95" y="698" class="col">last_heartbeat, updated_at</text>
+    <text x="95" y="718" class="col">total_events, total_traffic_logs</text>
+    <text x="95" y="738" class="col">metadata</text>
+    <text x="95" y="758" class="col-fk">FK  owner_user_id -&gt; users</text>
+    <text x="95" y="778" class="col">last_firewall_applied_revision</text>
+    <text x="95" y="798" class="col">last_firewall_status_at</text>
+    <text x="95" y="818" class="col">firewall_status_json</text>
+  </g>
+
+  <path d="M 220 460 L 220 500" fill="none" stroke="#00897b" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+  <text x="228" y="485" class="rel-label">0..1 owns</text>
+
+  <g id="firewall_agent_commands">
+    <rect x="440" y="560" width="310" height="220" rx="8" fill="#fff" stroke="#00796b" stroke-width="2"/>
+    <rect x="440" y="560" width="310" height="36" rx="8" fill="#00796b"/>
+    <rect x="440" y="588" width="310" height="8" fill="#00796b"/>
+    <text x="455" y="585" class="tbl-title">firewall_agent_commands</text>
+    <text x="455" y="618" class="col-pk">PK  id</text>
+    <text x="455" y="638" class="col-fk">FK  agent_id -&gt; agents</text>
+    <text x="455" y="658" class="col">command_id (UK)</text>
+    <text x="455" y="678" class="col">revision, action</text>
+    <text x="455" y="698" class="col">payload, created_at</text>
+  </g>
+
+  <line x1="380" y1="680" x2="440" y2="680" stroke="#00796b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="385" y="668" class="rel-label">1:N CASCADE</text>
+
+  <g id="firewall_sync_state">
+    <rect x="440" y="820" width="260" height="120" rx="8" fill="#fff" stroke="#6d4c41" stroke-width="2"/>
+    <rect x="440" y="820" width="260" height="36" rx="8" fill="#6d4c41"/>
+    <rect x="440" y="848" width="260" height="8" fill="#6d4c41"/>
+    <text x="455" y="845" class="tbl-title">firewall_sync_state</text>
+    <text x="455" y="878" class="col-pk">PK  id (singleton=1)</text>
+    <text x="455" y="898" class="col">revision (monotonic)</text>
+    <text x="455" y="918" class="rel-label">logical link to firewall_rules</text>
+  </g>
+
+  <g id="security_events">
+    <rect x="820" y="160" width="320" height="360" rx="8" fill="#fff" stroke="#c62828" stroke-width="2.5"/>
+    <rect x="820" y="160" width="320" height="36" rx="8" fill="#c62828"/>
+    <rect x="820" y="188" width="320" height="8" fill="#c62828"/>
+    <text x="835" y="185" class="tbl-title">security_events</text>
+    <text x="835" y="218" class="col-pk">PK  id</text>
+    <text x="835" y="238" class="col">event_type, agent_name</text>
+    <text x="835" y="258" class="col">severity, source_ip</text>
+    <text x="835" y="278" class="col">destination_ip, location</text>
+    <text x="835" y="298" class="col">protocol, port, status</text>
+    <text x="835" y="318" class="col">description, metadata</text>
+    <text x="835" y="338" class="col">created_at, resolved_at</text>
+    <text x="835" y="358" class="col">handled_by, blocked</text>
+    <text x="835" y="378" class="col">risk_score, source</text>
+    <text x="835" y="408" class="rel-label">agent_name -&gt; agents (logical)</text>
+  </g>
+
+  <g id="event_blocking_policies">
+    <rect x="820" y="560" width="320" height="240" rx="8" fill="#fff" stroke="#e65100" stroke-width="2"/>
+    <rect x="820" y="560" width="320" height="36" rx="8" fill="#e65100"/>
+    <rect x="820" y="588" width="320" height="8" fill="#e65100"/>
+    <text x="835" y="585" class="tbl-title">event_blocking_policies</text>
+    <text x="835" y="618" class="col-pk">PK  id</text>
+    <text x="835" y="638" class="col">name, event_type_pattern</text>
+    <text x="835" y="658" class="col">severity, source_ip_prefix</text>
+    <text x="835" y="678" class="col">blocked, priority, enabled</text>
+    <text x="835" y="698" class="col">created_at, updated_at</text>
+    <text x="835" y="728" class="rel-label">resolves security_events.blocked</text>
+  </g>
+
+  <path d="M 980 560 L 980 520" fill="none" stroke="#e65100" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+  <text x="990" y="545" class="rel-label">policy match</text>
+
+  <g id="traffic_logs">
+    <rect x="1180" y="160" width="300" height="340" rx="8" fill="#fff" stroke="#1565c0" stroke-width="2.5"/>
+    <rect x="1180" y="160" width="300" height="36" rx="8" fill="#1565c0"/>
+    <rect x="1180" y="188" width="300" height="8" fill="#1565c0"/>
+    <text x="1195" y="185" class="tbl-title">traffic_logs</text>
+    <text x="1195" y="218" class="col-pk">PK  id</text>
+    <text x="1195" y="238" class="col-fk">FK  session_id -&gt; user_sessions</text>
+    <text x="1195" y="258" class="col">source_ip, destination_ip</text>
+    <text x="1195" y="278" class="col">source_port, destination_port</text>
+    <text x="1195" y="298" class="col">protocol</text>
+    <text x="1195" y="318" class="col">bytes_transferred, packets_transferred</text>
+    <text x="1195" y="338" class="col">duration</text>
+    <text x="1195" y="358" class="col">is_anomaly, anomaly_score</text>
+    <text x="1195" y="378" class="col">anomaly_reason, raw_data</text>
+    <text x="1195" y="398" class="col">agent_name, timestamp</text>
+    <text x="1195" y="428" class="rel-label">agent_name -&gt; agents (logical)</text>
+  </g>
+
+  <path d="M 720 320 L 1180 280" fill="none" stroke="#1565c0" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="900" y="295" class="rel-label">1:N SET NULL</text>
+
+  <g id="firewall_rules">
+    <rect x="1180" y="560" width="300" height="300" rx="8" fill="#fff" stroke="#4527a0" stroke-width="2.5"/>
+    <rect x="1180" y="560" width="300" height="36" rx="8" fill="#4527a0"/>
+    <rect x="1180" y="588" width="300" height="8" fill="#4527a0"/>
+    <text x="1195" y="585" class="tbl-title">firewall_rules</text>
+    <text x="1195" y="618" class="col-pk">PK  id</text>
+    <text x="1195" y="638" class="col">name, action</text>
+    <text x="1195" y="658" class="col">source_address, destination_address</text>
+    <text x="1195" y="678" class="col">port, priority, enabled</text>
+    <text x="1195" y="698" class="col">hits, description</text>
+    <text x="1195" y="718" class="col">created_at, updated_at, created_by</text>
+    <text x="1195" y="748" class="rel-label">UK: source+action+enabled+dest+port</text>
+    <text x="1195" y="768" class="rel-label">bumps firewall_sync_state.revision</text>
+  </g>
+
+  <path d="M 1330 560 L 570 820" fill="none" stroke="#6d4c41" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+
+  <rect x="70" y="145" width="660" height="345" rx="10" fill="none" stroke="#3949ab" stroke-width="1" stroke-dasharray="8,4" opacity="0.4"/>
+  <text x="75" y="140" class="rel-label" fill="#3949ab">Auth and Sessions</text>
+
+  <rect x="70" y="505" width="690" height="450" rx="10" fill="none" stroke="#00897b" stroke-width="1" stroke-dasharray="8,4" opacity="0.4"/>
+  <text x="75" y="500" class="rel-label" fill="#00897b">Agents and Firewall Sync</text>
+
+  <rect x="810" y="145" width="340" height="670" rx="10" fill="none" stroke="#c62828" stroke-width="1" stroke-dasharray="8,4" opacity="0.4"/>
+  <text x="815" y="140" class="rel-label" fill="#c62828">Security Events and Policies</text>
+
+  <rect x="1170" y="145" width="320" height="730" rx="10" fill="none" stroke="#1565c0" stroke-width="1" stroke-dasharray="8,4" opacity="0.4"/>
+  <text x="1175" y="140" class="rel-label" fill="#1565c0">Traffic and Firewall Rules</text>
+
+  <text x="80" y="1000" class="subtitle">beacon/docs/database-erd.svg - Insert Pictures in PowerPoint</text>
+</svg>

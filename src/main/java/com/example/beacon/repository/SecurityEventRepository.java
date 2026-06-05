@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Long> {
@@ -33,6 +34,33 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
     
     @Query("SELECT e FROM SecurityEvent e WHERE e.riskScore >= :minScore ORDER BY e.riskScore DESC")
     List<SecurityEvent> findHighRiskEvents(@Param("minScore") Double minScore);
+
+    @Query("SELECT e FROM SecurityEvent e WHERE e.eventType = :eventType " +
+           "AND e.sourceIp = :sourceIp " +
+           "AND ((:destinationIp IS NULL AND e.destinationIp IS NULL) OR e.destinationIp = :destinationIp) " +
+           "AND e.description = :description " +
+           "AND e.createdAt >= :since ORDER BY e.createdAt DESC")
+    List<SecurityEvent> findRecentAlertAggregateCandidates(@Param("eventType") String eventType,
+                                                           @Param("sourceIp") String sourceIp,
+                                                           @Param("destinationIp") String destinationIp,
+                                                           @Param("description") String description,
+                                                           @Param("since") LocalDateTime since);
+
+    @Query("SELECT e FROM SecurityEvent e WHERE e.eventType = :eventType " +
+           "AND e.sourceIp = :sourceIp " +
+           "AND e.createdAt >= :since ORDER BY e.createdAt DESC")
+    List<SecurityEvent> findRecentTypeBySourceIp(@Param("eventType") String eventType,
+                                                 @Param("sourceIp") String sourceIp,
+                                                 @Param("since") LocalDateTime since);
+
+    @Query("SELECT e FROM SecurityEvent e WHERE " +
+           "((:agentName IS NOT NULL AND e.agentName = :agentName) OR e.sourceIp = :principalIp OR e.principalIp = :principalIp) " +
+           "AND e.createdAt >= :since ORDER BY e.createdAt ASC")
+    List<SecurityEvent> findRecentCorrelationCandidates(@Param("agentName") String agentName,
+                                                        @Param("principalIp") String principalIp,
+                                                        @Param("since") LocalDateTime since);
+
+    Optional<SecurityEvent> findTopByIncidentKeyOrderByCreatedAtAsc(String incidentKey);
 
     @Query("SELECT e FROM SecurityEvent e WHERE " +
            "(:severity = 'all' OR e.severity = :severity) AND " +
@@ -82,13 +110,16 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
     @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE e.status = 'pending' OR e.status = '조사중'")
     Long countUnresolvedEvents();
 
-    @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE e.resolvedAt IS NOT NULL")
-    Long countResolvedEvents();
+    @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE (:since IS NULL OR e.createdAt >= :since)")
+    Long countEventsSince(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE e.resolvedAt IS NOT NULL AND (:since IS NULL OR e.createdAt >= :since)")
+    Long countResolvedEvents(@Param("since") LocalDateTime since);
 
     /** 해결된 이벤트의 평균 처리 시간 (분 단위, MySQL TIMESTAMPDIFF) */
     @Query("SELECT AVG(TIMESTAMPDIFF(MINUTE, e.createdAt, e.resolvedAt)) " +
-           "FROM SecurityEvent e WHERE e.resolvedAt IS NOT NULL")
-    Double averageResolutionMinutes();
+           "FROM SecurityEvent e WHERE e.resolvedAt IS NOT NULL AND (:since IS NULL OR e.createdAt >= :since)")
+    Double averageResolutionMinutes(@Param("since") LocalDateTime since);
 
     /** 미해결 이벤트를 severity별로 집계 */
     @Query("SELECT COUNT(e) FROM SecurityEvent e " +
@@ -107,24 +138,21 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, Lo
                                 @Param("start")    LocalDateTime start,
                                 @Param("end")      LocalDateTime end);
 
-    /**
-     * 기간 내 연월(YYYYMM 형식)과 severity별 이벤트 수를 한 번에 집계한다.
-     * getMonthlyScores() 에서 N×3 쿼리 대신 단일 쿼리로 대체하기 위해 사용한다.
-     * 반환: [yearMonth(String), severity(String), count(Long)]
-     */
     @Query("SELECT FUNCTION('DATE_FORMAT', e.createdAt, '%Y%m'), e.severity, COUNT(e) " +
            "FROM SecurityEvent e " +
            "WHERE e.createdAt >= :since AND e.severity IN ('critical','high','medium') " +
            "GROUP BY FUNCTION('DATE_FORMAT', e.createdAt, '%Y%m'), e.severity")
     List<Object[]> countBySeverityGroupedByMonth(@Param("since") LocalDateTime since);
 
-    /**
-     * 미해결 이벤트를 severity별로 한 번에 집계한다.
-     * calculateSecurityScore() 에서 4번의 단건 쿼리 대신 단일 쿼리로 대체한다.
-     * 반환: [severity(String), count(Long)]
-     */
     @Query("SELECT e.severity, COUNT(e) FROM SecurityEvent e " +
-           "WHERE e.status = 'pending' OR e.status = '조사중' " +
+           "WHERE (e.status = 'pending' OR e.status = '조사중') " +
+           "AND (:since IS NULL OR e.createdAt >= :since) " +
            "GROUP BY e.severity")
-    List<Object[]> countUnresolvedGroupedBySeverity();
+    List<Object[]> countUnresolvedGroupedBySeverity(@Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(e) FROM SecurityEvent e WHERE (e.status = 'pending' OR e.status = '조사중') AND (:since IS NULL OR e.createdAt >= :since)")
+    Long countUnresolvedEvents(@Param("since") LocalDateTime since);
+
+    @Query("SELECT e FROM SecurityEvent e WHERE (e.riskScore >= :minScore OR e.severity IN ('critical', 'high')) AND (:since IS NULL OR e.createdAt >= :since) ORDER BY e.createdAt DESC")
+    List<SecurityEvent> findHighRiskEventsSince(@Param("minScore") Double minScore, @Param("since") LocalDateTime since);
 }

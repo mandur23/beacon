@@ -14,7 +14,9 @@ import java.time.LocalDateTime;
     @Index(name = "idx_severity", columnList = "severity"),
     @Index(name = "idx_created_at", columnList = "createdAt"),
     @Index(name = "idx_source_ip", columnList = "sourceIp"),
-    @Index(name = "idx_agent_name", columnList = "agentName")
+    @Index(name = "idx_agent_name", columnList = "agentName"),
+    @Index(name = "idx_incident_key", columnList = "incidentKey"),
+    @Index(name = "idx_principal_ip", columnList = "principalIp")
 })
 @Data
 @NoArgsConstructor
@@ -34,6 +36,9 @@ public class SecurityEvent {
     
     @Column(nullable = false, length = 20)
     private String severity;
+
+    @Column(length = 20)
+    private String originalSeverity;
     
     @Column(nullable = false, length = 45)
     private String sourceIp;
@@ -62,12 +67,31 @@ public class SecurityEvent {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column
+    private LocalDateTime lastSeenAt;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer repeatCount = 1;
     
     @Column
     private LocalDateTime resolvedAt;
     
     @Column(length = 100)
     private String handledBy;
+
+    @Column(length = 45)
+    private String principalIp;
+
+    @Column(length = 100)
+    private String incidentKey;
+
+    @Column(length = 100)
+    private String incidentType;
+
+    @Column(length = 50)
+    private String correlationStatus;
     
     @Builder.Default
     @Column(nullable = false)
@@ -77,8 +101,33 @@ public class SecurityEvent {
     @Column(nullable = false)
     private Double riskScore = 0.0;
 
+    @Column
+    private Double originalRiskScore;
+
     /** 이벤트 수집 경로 (Suricata / Syslog / 에이전트 API / 수동) */
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private EventSource source;
+
+    @Column(length = 20)
+    private String originalSource;
+
+    @PrePersist
+    void onCreate() {
+        if (repeatCount == null || repeatCount < 1) {
+            repeatCount = 1;
+        }
+        if (lastSeenAt == null) {
+            lastSeenAt = LocalDateTime.now();
+        }
+        if (riskScore == null) {
+            riskScore = 0.0;
+        }
+        if (blocked == null) {
+            blocked = true;
+        }
+        if (severity == null || severity.isBlank()) {
+            severity = "LOW";
+        }
+    }
 }

@@ -87,6 +87,46 @@ logging:
     com.example.beacon: ${LOG_LEVEL_APP:INFO}
     org.springframework.security: ${LOG_LEVEL_SECURITY:WARN}
 
+guardian:
+  correlation:
+    admin-source-ips:
+      - 192.168.1.10
+    admin-destination-ips: []
+    ignored-event-types:
+      - biometric_anomaly
+    ignored-agent-names:
+      - suricata-local
+    local-loopback-ips:
+      - 127.0.1.1
+      - 127.0.0.1
+    rpi-guardian-source-ips:
+      - 192.168.1.10
+      - 127.0.1.1
+      - 127.0.0.1
+    ignored-rpi-guardian-destination-ips: []
+    ignored-description-keywords:
+      - ids_http
+      - ids_fileinfo
+      - python basehttp serverbanner
+      - /api/health
+      - /api/model/status
+      - /static/
+      - misc activity
+    defense-evasion-indicators:
+      - agent_offline
+      - heartbeat lost
+      - beacon stop
+      - disable
+    wazuh:
+      preserve-level-min: 10
+      critical-level-min: 12
+      high-level-min: 10
+      medium-level-min: 5
+      low-risk-floor: 15.0
+      medium-risk-floor: 50.0
+      high-risk-floor: 80.0
+      critical-risk-floor: 95.0
+
 beacon:
   firewall:
     channel-mode: ${BEACON_FIREWALL_CHANNEL_MODE:DUAL}

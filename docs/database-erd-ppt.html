@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Beacon ERD - PPT Export</title>
+  <style>
+  body { margin: 0; background: #eee; font-family: 'Segoe UI', sans-serif; }
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    background: #1a1a2e; color: #fff; padding: 12px 24px;
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  }
+  .toolbar button {
+    background: #5c6bc0; color: #fff; border: none; padding: 8px 16px;
+    border-radius: 6px; cursor: pointer; font-size: 14px;
+  }
+  .toolbar button:hover { background: #3949ab; }
+  .toolbar p { margin: 0; font-size: 13px; opacity: 0.85; }
+  .slide-wrap {
+    margin: 80px auto 40px; width: 1920px; max-width: 100%;
+    box-shadow: 0 8px 32px rgba(0,0,0,.15);
+  }
+  .slide-wrap img, .slide-wrap object { width: 100%; display: block; }
+  @media print {
+    .toolbar { display: none; }
+    .slide-wrap { margin: 0; box-shadow: none; }
+  }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <strong>Beacon Database ERD</strong>
+    <button type="button" onclick="window.print()">PDF로 저장 (인쇄)</button>
+    <p>PPT: 삽입 → 그림 → <code>database-erd.png</code> 또는 <code>database-erd.svg</code></p>
+  </div>
+  <div class="slide-wrap">
+    <object data="database-erd.svg" type="image/svg+xml" width="1920" height="1080">
+      <img src="database-erd.png" alt="Beacon Database ERD" width="1920" height="1080">
+    </object>
+  </div>
+</body>
+</html>

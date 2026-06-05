@@ -17,6 +17,10 @@ versioned_migrations:
     - V10__Security_Events_Indexes.sql
     - V14__Add_Agent_Name_To_Security_Events.sql
     - V15__Extend_Metadata_Column_Size.sql
+    - V17__Add_Correlation_Columns_To_Security_Events.sql
+    - V18__Add_Aggregation_Columns_To_Security_Events.sql
+    - V19__Preserve_Original_Event_Judgement.sql
+    - V20__Repair_Missing_V17_Correlation_Columns.sql
 
   firewall:
     - V9__Firewall_Rules_Dedup_And_Unique_Index.sql

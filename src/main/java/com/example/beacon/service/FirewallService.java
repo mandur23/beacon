@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,6 +171,86 @@ public class FirewallService {
         int updated = firewallRuleRepository.incrementHitsBySourceIp(sourceIp);
         if (updated > 0) {
             log.debug("[Firewall] hits 증가 - ip={}, rules={}", sourceIp, updated);
+        }
+    }
+
+    @Transactional
+    public void deleteBlockRuleForIp(String ip, String handledBy) {
+        if (ip == null || ip.isBlank()) return;
+        firewallRuleRepository.findFirstBySourceAddressAndActionAndEnabledTrue(ip, "block")
+                .ifPresent(rule -> {
+                    long ruleId = rule.getId();
+                    firewallRuleRepository.delete(rule);
+                    long rev = firewallRevisionService.bumpRevision();
+                    firewallCommandEnqueueService.enqueueDeleteRule(rev, ruleId);
+                    log.info("[Firewall] 수동 차단 해제 (예외 처리) - ip={}, by={}", ip, handledBy);
+                });
+        applyLocalUnblock(ip);
+    }
+
+    @Transactional
+    public FirewallRule createAllowRuleForIp(String ip, String reason, String createdBy) {
+        if (ip == null || ip.isBlank()) return null;
+
+        return firewallRuleRepository
+                .findFirstBySourceAddressAndActionAndEnabledTrue(ip, "allow")
+                .orElseGet(() -> createNewAllowRule(ip, reason, createdBy));
+    }
+
+    private FirewallRule createNewAllowRule(String ip, String reason, String createdBy) {
+        FirewallRule rule = FirewallRule.builder()
+                .name("WHITELIST " + ip)
+                .action("allow")
+                .sourceAddress(ip)
+                .destinationAddress("any")
+                .port("any")
+                .priority(5)
+                .enabled(true)
+                .hits(0L)
+                .description(reason)
+                .createdBy(createdBy)
+                .build();
+        try {
+            FirewallRule saved = firewallRuleRepository.save(rule);
+            long rev = firewallRevisionService.bumpRevision();
+            firewallCommandEnqueueService.enqueueUpsertRule(rev, saved.getId());
+            applyLocalAllow(ip);
+            log.info("[Firewall] 자동 허용(예외) 규칙 생성 - ip={}, createdBy={}", ip, createdBy);
+            return saved;
+        } catch (DataIntegrityViolationException e) {
+            log.warn("[Firewall] allow 규칙 동시 삽입 경합, 기존 규칙 재사용 - ip={}", ip);
+            return firewallRuleRepository
+                    .findFirstBySourceAddressAndActionAndEnabledTrue(ip, "allow")
+                    .orElseThrow(() -> new IllegalStateException(
+                            "방화벽 allow 규칙 동시 삽입 충돌 후 재조회 실패 - ip=" + ip, e));
+        }
+    }
+
+    private void applyLocalUnblock(String ip) {
+        try {
+            Process process = new ProcessBuilder("sudo", "/usr/local/bin/beacon-unblock-ip", ip)
+                    .redirectErrorStream(true)
+                    .start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                log.info("[Firewall] 로컬 방화벽 차단 해제 적용 - ip={}, output={}", ip, output);
+            } else {
+                log.warn("[Firewall] 로컬 방화벽 차단 해제 실패 - ip={}, exitCode={}, output={}", ip, exitCode, output);
+            }
+        } catch (Exception e) {
+            log.warn("[Firewall] 로컬 방화벽 차단 해제 실행 오류 - ip={}, error={}", ip, e.getMessage());
+        }
+    }
+
+    private void applyLocalAllow(String ip) {
+        try {
+            Process process = new ProcessBuilder("sudo", "/usr/local/bin/beacon-allow-ip", ip)
+                    .redirectErrorStream(true)
+                    .start();
+            process.waitFor();
+        } catch (Exception e) {
+            log.warn("[Firewall] 로컬 방화벽 허용 실행 오류 - ip={}, error={}", ip, e.getMessage());
         }
     }
 
